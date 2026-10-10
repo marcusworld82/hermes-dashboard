@@ -43,7 +43,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] md:h-screen bg-[#f4f5f7]">
+    <div className="flex flex-col h-[calc(100vh-56px)] md:h-screen">
       {/* Model switcher */}
       <div className="flex items-center justify-center py-4">
         <div className="relative">

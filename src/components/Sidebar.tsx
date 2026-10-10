@@ -58,7 +58,7 @@ export function Sidebar() {
         initial={false}
         animate={{ width: collapsed ? 72 : 240 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="hidden md:flex flex-col h-screen sticky top-0 bg-white/70 backdrop-blur-xl border-r border-[#e8eaee] z-30"
+        className="hidden md:flex flex-col h-screen sticky top-0 bg-white/50 backdrop-blur-xl border-r border-white/60 z-30"
       >
         <div className="flex items-center justify-between px-4 h-16">
           {!collapsed && (

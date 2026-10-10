@@ -1,9 +1,7 @@
-@import "tailwindcss";
-
 :root {
-  --bg: #f4f5f7;
+  --bg: #f7f6f4;
   --surface: #ffffff;
-  --surface-soft: #fafbfc;
+  --surface-soft: #fcfcfd;
   --border: #e8eaee;
   --text: #1a1d24;
   --text-muted: #6b7280;
@@ -31,7 +29,6 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
   color: var(--text);
   font-family: "Outfit", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -39,6 +36,14 @@ html, body {
 
 body {
   min-height: 100vh;
+  background: #f7f6f4;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 15% 10%, rgba(255, 255, 255, 0.95) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 85% 20%, rgba(255, 248, 240, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 70% at 50% 90%, rgba(240, 244, 250, 0.6) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 40% at 70% 60%, rgba(255, 255, 255, 0.4) 0%, transparent 40%),
+    linear-gradient(180deg, #faf9f7 0%, #f4f3f1 50%, #f6f5f3 100%);
+  background-attachment: fixed;
 }
 
 a {

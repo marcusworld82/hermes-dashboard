@@ -3,9 +3,9 @@
 Light-only visual system inspired by Juice Lab’s soft SaaS dashboards.
 
 ## Palette
-- Background: `#f4f5f7`
+- Background: pearl `#f7f6f4` with soft radial sheen (white / warm / cool overlays)
 - Surface: `#ffffff`
-- Surface soft: `#fafbfc`
+- Surface soft: `#fcfcfd`
 - Border: `#e8eaee`
 - Text: `#1a1d24`
 - Text muted: `#6b7280`
