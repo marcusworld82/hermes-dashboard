@@ -9,6 +9,12 @@ const outfit = Outfit({
   display: "swap",
 });
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata: Metadata = {
   title: "Hermes Dashboard",
   description: "Personal Hermes agent control center",
