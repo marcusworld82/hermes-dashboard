@@ -21,6 +21,8 @@ npm run dev
 | Connections | Live status of Hermes, model keys, bridges, MCP servers, CRM, Obsidian, phone |
 | Social | Calendar, drafts and captions read from the CRM |
 | CRM | The Studio CRM inside the dashboard. Desktop on this Mac only. |
+| Recast | Video breakdowns into captions and scripts (needs its own Google key). Desktop only, with a Start button. |
+| OpenAdKit | Open-source AI ad copy and creative tool (needs its own provider key). Desktop only, with a Start button. |
 | Settings | The agent runs switch and where everything lives |
 
 ## How it works

@@ -50,6 +50,10 @@ Your agent package lists skills that are not installed in Hermes yet. The Skills
 
 Social reads drafts and the schedule from the CRM. Scheduling and posting stay in the CRM, which holds the Postiz connection. Facebook is not connected in Postiz yet.
 
-## 8. Workflow schedules
+## 8. Recast and OpenAdKit
+
+Both open from the dashboard sidebar on your Mac and have a Start button. Recast needs `GOOGLE_API_KEY` in `~/Desktop/Content and Outreach App/integrations/recast/.env.local`, then a restart. OpenAdKit asks for its own AI provider key inside the tool.
+
+## 9. Workflow schedules
 
 Workflows save a "when it runs" note. Automatic scheduling is not switched on yet. Ask Claude to wire it to `hermes cron` once agent runs are on.

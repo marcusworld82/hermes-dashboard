@@ -46,7 +46,7 @@ export function QuickChat() {
     })().catch(() => {});
   }, [open, threadId]);
 
-  if (pathname.startsWith("/chat") || pathname.startsWith("/crm")) return null;
+  if (["/chat", "/crm", "/recast", "/openadkit"].some((p) => pathname.startsWith(p))) return null;
 
   return (
     <>

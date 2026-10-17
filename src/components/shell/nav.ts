@@ -9,6 +9,8 @@ import {
   Plug,
   CalendarDays,
   Users,
+  Film,
+  Megaphone,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -39,6 +41,8 @@ export const sections: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/social", label: "Social", icon: CalendarDays, hint: "Calendar and captions" },
       { href: "/crm", label: "CRM", icon: Users, desktopOnly: true, hint: "Leads, sales, inbox" },
+      { href: "/recast", label: "Recast", icon: Film, desktopOnly: true, hint: "Video to captions and scripts" },
+      { href: "/openadkit", label: "OpenAdKit", icon: Megaphone, desktopOnly: true, hint: "AI ad copy and creative" },
     ],
   },
 ];
