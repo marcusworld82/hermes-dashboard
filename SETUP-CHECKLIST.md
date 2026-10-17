@@ -39,7 +39,7 @@ Claude Code and Codex are already found on this Mac and use your subscriptions.
 ## 5. Phone
 
 - Telegram already works for talking to Hermes.
-- To open the dashboard on your iPhone: install Tailscale on the Mac and the iPhone, sign in to both with the same account, then run `tailscale serve 3200`. Open the address it prints on the phone, then Share, then Add to Home Screen.
+- To open the dashboard on your iPhone: install Tailscale on the Mac and the iPhone, sign in to both with the same account, then run `tailscale serve 3200`. Put the host name it prints (for example `mymac.tail1234.ts.net`) in `.env.local` as `DASHBOARD_HOSTS=...` and restart the dashboard. The dashboard refuses unknown host names on purpose. Then open the address on the phone, tap Share, then Add to Home Screen.
 - The CRM page stays Mac-only on purpose.
 
 ## 6. Skills
