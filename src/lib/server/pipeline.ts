@@ -4,6 +4,7 @@ import { getSettings, requireRuns } from "./settings";
 import * as hermes from "./hermes";
 import { getAgents, rosterForPrompt } from "./agents";
 import { logProject } from "./obsidian";
+import { skillsForAgent } from "./skills";
 
 // Inbox to Shipped. Four stages on top of the real Hermes board:
 // capture (idea parked as a blocked card) -> gate (plan waiting for Marcus)
@@ -187,6 +188,7 @@ export async function approve(id: string) {
       body: `${step.instructions}\n\nPart of: ${item.title}\nOriginal idea: ${item.idea}`,
       assignee: step.agent,
       parents: step.dependsOn.map((d) => stepTasks[d]).filter(Boolean),
+      skills: await skillsForAgent(step.agent),
       blocked: true,
     });
     stepTasks[step.key] = task.id;
@@ -196,6 +198,7 @@ export async function approve(id: string) {
     body: `Check every deliverable for "${item.title}" against the approved plan before it ships. List what passes, what fails and what is missing.\n\nPlan:\n${item.plan.summary}`,
     assignee: "rhquality",
     parents: Object.values(stepTasks),
+    skills: await skillsForAgent("rhquality"),
     blocked: true,
   });
   await hermes.comment(id, `Approved by Marcus. ${item.plan.steps.length} steps plus a quality check.${runs ? "" : " Waiting for agent runs to be turned on."}`);

@@ -86,6 +86,24 @@ export function assignSkill(name: string, agents: string[]) {
   });
 }
 
+// Skills to force-load on an agent's cards: what you assigned on the Skills page,
+// or the agent package's list when you have not assigned anything yet. Only
+// skills Hermes actually has installed are passed, so a card never fails to start.
+export async function skillsForAgent(agentId: string) {
+  const assigned = readJson<Record<string, string[]>>("skill-assignments", {});
+  const agent = (await getAgents()).find((a) => a.id === agentId);
+  const names = new Set<string>();
+  for (const s of agent?.skills ?? []) if (!(s in assigned)) names.add(s);
+  for (const [s, agents] of Object.entries(assigned)) if (agents.includes(agentId)) names.add(s);
+  let installed: Set<string>;
+  try {
+    installed = new Set((await listSkills()).filter((s) => s.status !== "disabled").map((s) => s.name));
+  } catch {
+    return [];
+  }
+  return [...names].filter((n) => installed.has(n));
+}
+
 export function skillsFor(agentId: string) {
   const assigned = readJson<Record<string, string[]>>("skill-assignments", {});
   return Object.entries(assigned)
