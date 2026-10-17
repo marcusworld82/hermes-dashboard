@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
@@ -9,15 +9,18 @@ const outfit = Outfit({
   display: "swap",
 });
 
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f7f6f4",
 };
 
 export const metadata: Metadata = {
-  title: "Hermes Dashboard",
-  description: "Personal Hermes agent control center",
+  title: "Hermes",
+  description: "Marcus's command center for Hermes agents",
+  appleWebApp: { capable: true, title: "Hermes", statusBarStyle: "default" },
 };
 
 export default function RootLayout({

@@ -2,125 +2,201 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, GripVertical } from "lucide-react";
+import { Loader2, MessageSquare, Pause, Play, Archive } from "lucide-react";
+import { api, timeAgo, useApi } from "@/lib/client";
+import { Avatar, Badge, Button, ErrorNote, Page, PageHeader, Segmented, Sheet, cx, inputCls, statusTone } from "@/components/ui";
 
-type Task = {
-  id: string;
-  title: string;
-  agent: string;
-  priority: "low" | "med" | "high";
+type Task = { id: string; title: string; body: string | null; assignee: string | null; status: string; created_at: number; result: string | null; last_failure_error: string | null };
+type Detail = {
+  task: Task;
+  latest_summary: string | null;
+  parents: string[];
+  children: string[];
+  comments: { author: string; body: string; created_at: number }[];
+  events: { kind: string; created_at?: number }[];
+  runs: Record<string, unknown>[];
 };
+type Board = { slug: string; name: string };
+type Agent = { id: string; name: string; short: string; color: string };
 
-const columns = [
-  { id: "intake", title: "Intake", color: "bg-slate-400" },
-  { id: "research", title: "Research", color: "bg-blue-500" },
-  { id: "write", title: "Write", color: "bg-emerald-500" },
-  { id: "code", title: "Code", color: "bg-violet-500" },
-  { id: "review", title: "Review", color: "bg-amber-500" },
-  { id: "done", title: "Done", color: "bg-rose-500" },
+const COLS = [
+  { id: "triage", label: "Triage", dot: "bg-slate-400" },
+  { id: "todo", label: "To do", dot: "bg-slate-500" },
+  { id: "ready", label: "Ready", dot: "bg-sky-500" },
+  { id: "running", label: "Running", dot: "bg-blue-500" },
+  { id: "review", label: "Review", dot: "bg-violet-500" },
+  { id: "blocked", label: "Blocked", dot: "bg-amber-500" },
+  { id: "done", label: "Done", dot: "bg-emerald-500" },
 ];
 
-const initial: Record<string, Task[]> = {
-  intake: [
-    { id: "t1", title: "New feature brief", agent: "—", priority: "med" },
-    { id: "t2", title: "Competitor scan", agent: "—", priority: "low" },
-  ],
-  research: [
-    { id: "t3", title: "Market trends Q4", agent: "Research", priority: "high" },
-  ],
-  write: [
-    { id: "t4", title: "Landing page copy", agent: "Writer", priority: "med" },
-  ],
-  code: [
-    { id: "t5", title: "Auth middleware fix", agent: "Coder", priority: "high" },
-  ],
-  review: [
-    { id: "t6", title: "PR #142 review", agent: "Reviewer", priority: "med" },
-  ],
-  done: [
-    { id: "t7", title: "Deploy staging", agent: "Deployer", priority: "low" },
-  ],
-};
-
 export default function KanbanPage() {
-  const [board, setBoard] = useState(initial);
-
-  const advance = (taskId: string, fromCol: string) => {
-    const fromIdx = columns.findIndex((c) => c.id === fromCol);
-    if (fromIdx < 0 || fromIdx === columns.length - 1) return;
-    const toCol = columns[fromIdx + 1].id;
-    setBoard((prev) => {
-      const task = prev[fromCol].find((t) => t.id === taskId);
-      if (!task) return prev;
-      return {
-        ...prev,
-        [fromCol]: prev[fromCol].filter((t) => t.id !== taskId),
-        [toCol]: [...prev[toCol], { ...task, agent: columns[fromIdx + 1].title }],
-      };
-    });
-  };
+  const [board, setBoard] = useState("command-center");
+  const { data, error, reload } = useApi<{ board: string; boards: Board[]; tasks: Task[] }>(`/api/kanban?board=${encodeURIComponent(board)}`, 15_000);
+  const { data: team } = useApi<{ agents: Agent[] }>("/api/agents");
+  const [col, setCol] = useState("todo");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const who = Object.fromEntries((team?.agents ?? []).map((a) => [a.id, a]));
+  const tasks = data?.tasks ?? [];
+  const count = (c: string) => tasks.filter((t) => t.status === c).length;
 
   return (
-    <div className="p-4 md:p-6 h-[calc(100vh-56px)] md:h-screen flex flex-col">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Kanban</h1>
-          <p className="text-sm text-[#6b7280]">Tasks move automatically to the next agent</p>
-        </div>
-        <button className="flex items-center gap-1.5 bg-[#1a1d24] text-white text-sm px-4 py-2 rounded-2xl hover:opacity-90 active:scale-[0.98] transition">
-          <Plus size={16} /> New task
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-x-auto pb-4">
-        <div className="flex gap-3 h-full min-w-max">
-          {columns.map((col) => (
-            <div
-              key={col.id}
-              className="w-[280px] flex-shrink-0 bg-white/60 rounded-3xl p-3 flex flex-col border border-[#e8eaee]/60"
-            >
+    <Page wide>
+      <PageHeader
+        title="Kanban"
+        sub="Every card on your Hermes boards. Cards with links wait for the cards before them, then start on their own."
+        action={
+          <select value={board} onChange={(e) => setBoard(e.target.value)} className="min-h-11 bg-white border border-[#e8eaee] rounded-2xl px-3 text-base md:text-sm max-w-[44vw]">
+            {(data?.boards ?? [{ slug: board, name: board }]).map((b) => (
+              <option key={b.slug} value={b.slug}>
+                {b.name || b.slug}
+              </option>
+            ))}
+          </select>
+        }
+      />
+      <ErrorNote text={error} />
+      <Segmented className="md:hidden mb-3" value={col} onChange={setCol} options={COLS.map((c) => ({ id: c.id, label: c.label, count: count(c.id) }))} />
+      <div className="md:overflow-x-auto md:pb-3 no-scrollbar">
+        <div className="md:flex md:gap-3 md:min-w-max">
+          {COLS.map((c) => (
+            <div key={c.id} className={cx("md:w-[270px] md:shrink-0 bg-white/60 rounded-3xl p-3 border border-[#e8eaee]/60", col !== c.id && "hidden md:block")}>
               <div className="flex items-center gap-2 px-2 mb-3">
-                <div className={`w-2 h-2 rounded-full ${col.color}`} />
-                <span className="font-medium text-sm">{col.title}</span>
-                <span className="ml-auto text-xs text-[#9ca3af]">{board[col.id]?.length || 0}</span>
+                <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                <span className="font-medium text-sm">{c.label}</span>
+                <span className="ml-auto text-xs text-[#9ca3af]">{count(c.id)}</span>
               </div>
-              <div className="flex-1 space-y-2 overflow-y-auto">
-                {(board[col.id] || []).map((task) => (
-                  <motion.div
-                    key={task.id}
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-2xl p-3 shadow-sm border border-[#e8eaee] group cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => advance(task.id, col.id)}
-                  >
-                    <div className="flex items-start gap-2">
-                      <GripVertical size={14} className="text-[#d1d5db] mt-0.5 opacity-0 group-hover:opacity-100" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium leading-snug">{task.title}</p>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-[#6b7280]">{task.agent}</span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full ${
-                              task.priority === "high"
-                                ? "bg-rose-50 text-rose-600"
-                                : task.priority === "med"
-                                ? "bg-amber-50 text-amber-600"
-                                : "bg-slate-50 text-slate-500"
-                            }`}
-                          >
-                            {task.priority}
+              <div className="space-y-2 min-h-16">
+                {tasks
+                  .filter((t) => t.status === c.id)
+                  .map((t) => {
+                    const a = t.assignee ? who[t.assignee] : undefined;
+                    return (
+                      <motion.button layout key={t.id} onClick={() => setOpenId(t.id)} className="w-full text-left bg-white rounded-2xl p-3 shadow-sm border border-[#e8eaee] hover:shadow-md transition-shadow">
+                        <p className="text-sm font-medium leading-snug">{t.title}</p>
+                        <div className="flex items-center justify-between mt-2 gap-2">
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            {t.assignee ? <Avatar name={a?.short ?? t.assignee} color={a?.color ?? "#6b7280"} size={18} /> : null}
+                            <span className="text-xs text-[#6b7280] truncate">{a?.short ?? t.assignee ?? "Unassigned"}</span>
                           </span>
+                          <span className="text-[11px] text-[#9ca3af] shrink-0">{timeAgo(t.created_at)}</span>
                         </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                      </motion.button>
+                    );
+                  })}
+                {count(c.id) === 0 && <p className="text-xs text-[#9ca3af] text-center py-6">Empty</p>}
               </div>
             </div>
           ))}
         </div>
       </div>
-    </div>
+      <TaskSheet id={openId} board={board} who={who} onClose={() => setOpenId(null)} onChanged={reload} />
+    </Page>
+  );
+}
+
+function TaskSheet({ id, board, who, onClose, onChanged }: { id: string | null; board: string; who: Record<string, Agent>; onClose: () => void; onChanged: () => void }) {
+  const { data, error, setData } = useApi<Detail>(id ? `/api/kanban/${id}?board=${encodeURIComponent(board)}` : null);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const act = async (action: string, extra: Record<string, unknown> = {}) => {
+    if (!id) return;
+    setBusy(action);
+    setMsg(null);
+    try {
+      const d = await api<Detail>(`/api/kanban/${id}?board=${encodeURIComponent(board)}`, { method: "POST", json: { action, ...extra } });
+      setData(d);
+      onChanged();
+      if (action === "comment") setText("");
+      if (action === "archive") onClose();
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const t = data?.task;
+  const a = t?.assignee ? who[t.assignee] : undefined;
+  return (
+    <Sheet open={!!id} onClose={onClose} title={t?.title ?? "Card"}>
+      <ErrorNote text={error || msg} />
+      {!t ? (
+        <p className="text-sm text-[#9ca3af]">Loading...</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Badge tone={statusTone(t.status)}>{t.status}</Badge>
+            <span className="flex items-center gap-1.5 text-xs text-[#6b7280]">
+              {a && <Avatar name={a.short} color={a.color} size={18} />}
+              {a?.name ?? t.assignee ?? "Unassigned"}
+            </span>
+            <span className="text-xs text-[#9ca3af]">{t.id}</span>
+          </div>
+          {t.body && <p className="text-sm leading-relaxed whitespace-pre-wrap mb-4">{t.body}</p>}
+          {t.result && <p className="text-sm bg-[#f0fdf4] text-[#166534] rounded-2xl px-3 py-2.5 mb-4 whitespace-pre-wrap">{t.result}</p>}
+          {t.last_failure_error && <p className="text-sm bg-[#fee2e2] text-[#991b1b] rounded-2xl px-3 py-2.5 mb-4">{t.last_failure_error}</p>}
+
+          {(data.parents.length > 0 || data.children.length > 0) && (
+            <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+              <div className="rounded-2xl bg-[#fafbfc] border border-[#e8eaee] p-3">
+                <p className="text-[#9ca3af] mb-1">Waits for</p>
+                {data.parents.length ? data.parents.map((p) => <p key={p}>{p}</p>) : <p className="text-[#9ca3af]">Nothing</p>}
+              </div>
+              <div className="rounded-2xl bg-[#fafbfc] border border-[#e8eaee] p-3">
+                <p className="text-[#9ca3af] mb-1">Then unlocks</p>
+                {data.children.length ? data.children.map((p) => <p key={p}>{p}</p>) : <p className="text-[#9ca3af]">Nothing</p>}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 mb-5">
+            {t.status === "blocked" ? (
+              <Button size="sm" variant="light" onClick={() => act("unblock")} disabled={!!busy}>
+                <Play size={14} /> Release
+              </Button>
+            ) : t.status !== "done" ? (
+              <Button size="sm" variant="light" onClick={() => act("block")} disabled={!!busy}>
+                <Pause size={14} /> Pause
+              </Button>
+            ) : null}
+            <Button size="sm" variant="ghost" onClick={() => act("archive")} disabled={!!busy}>
+              <Archive size={14} /> Archive
+            </Button>
+          </div>
+
+          <p className="text-xs font-medium text-[#6b7280] mb-2">Comments</p>
+          <div className="space-y-2 mb-3">
+            {data.comments.length === 0 && <p className="text-xs text-[#9ca3af]">No comments yet.</p>}
+            {data.comments.map((c, i) => (
+              <div key={i} className="rounded-2xl bg-[#fafbfc] border border-[#e8eaee] px-3 py-2">
+                <p className="text-[11px] text-[#9ca3af]">
+                  {who[c.author]?.name ?? c.author} · {timeAgo(c.created_at)}
+                </p>
+                <p className="text-sm whitespace-pre-wrap">{c.body}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mb-5">
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a comment" className={inputCls} />
+            <Button onClick={() => act("comment", { text })} disabled={!text.trim() || !!busy} aria-label="Add comment">
+              {busy === "comment" ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}
+            </Button>
+          </div>
+
+          <p className="text-xs font-medium text-[#6b7280] mb-2">History</p>
+          <div className="space-y-1 text-xs text-[#6b7280]">
+            {data.events.slice(-12).map((e, i) => (
+              <p key={i}>
+                {e.kind.replace(/_/g, " ")}
+                {e.created_at ? ` · ${timeAgo(e.created_at)}` : ""}
+              </p>
+            ))}
+            <p className="text-[#9ca3af]">{data.runs.length} agent runs</p>
+          </div>
+        </>
+      )}
+    </Sheet>
   );
 }

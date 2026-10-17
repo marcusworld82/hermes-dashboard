@@ -48,13 +48,16 @@ body {
   background-attachment: fixed;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+/* In the base layer so Tailwind classes like text-white can override them. */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button {
-  font-family: inherit;
+  button {
+    font-family: inherit;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -64,4 +67,72 @@ button {
 ::-webkit-scrollbar-thumb {
   background: #d1d5db;
   border-radius: 99px;
+}
+/* ---------- app-like behavior ---------- */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+:root {
+  --tabbar-h: 64px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: calc(0.75rem + var(--safe-b));
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bottom sheet on phones, side drawer on desktop */
+.sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 90dvh;
+  border-radius: 28px 28px 0 0;
+}
+@media (min-width: 768px) {
+  .sheet {
+    left: auto;
+    top: 12px;
+    bottom: 12px;
+    right: 12px;
+    width: min(560px, calc(100vw - 24px));
+    max-height: none;
+    border-radius: 28px;
+  }
+}
+
+/* Room for the phone tab bar under every page */
+.app-main {
+  padding-top: calc(56px + var(--safe-t));
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 24px);
+}
+@media (min-width: 768px) {
+  .app-main {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* Full-height screens (chat, board) */
+.screen-h {
+  height: calc(100dvh - 56px - var(--safe-t) - var(--tabbar-h) - var(--safe-b));
+}
+@media (min-width: 768px) {
+  .screen-h {
+    height: 100dvh;
+  }
 }
