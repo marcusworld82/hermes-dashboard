@@ -7,7 +7,7 @@ import { api, useApi } from "@/lib/client";
 import { GroupEditor } from "@/components/chat/GroupEditor";
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Page, PageHeader, Sheet } from "@/components/ui";
 
-type Agent = { id: string; name: string; short: string; color: string; description: string; reportsTo: string | null; isHead: boolean; gateway: string | null; liveModel: string | null; installed: boolean; skills: string[] };
+type Agent = { id: string; name: string; short: string; title: string; color: string; description: string; reportsTo: string | null; isHead: boolean; gateway: string | null; liveModel: string | null; installed: boolean; skills: string[] };
 type Group = { id: string; name: string; members: string[]; lead: string };
 type Data = { agents: Agent[]; talk: Record<string, number>; tasks: Record<string, number>; groups: Group[] };
 
@@ -21,6 +21,7 @@ function AgentCard({ a, talk, tasks }: { a: Agent; talk: number; tasks: number }
             <p className="font-semibold truncate">{a.name}</p>
             {a.isHead && <Crown size={14} className="text-amber-500 shrink-0" />}
           </div>
+          <p className="text-xs font-medium text-[#9ca3af]">{a.title}</p>
           <p className="text-xs text-[#6b7280] mt-0.5 line-clamp-2 leading-relaxed">{a.description}</p>
         </div>
       </div>
@@ -46,7 +47,7 @@ export default function AgentsPage() {
 
   return (
     <Page wide>
-      <PageHeader title="Agents" sub="Your eight agents from the Lazy Money Agents package, running in Hermes. Everyone reports to the Operator." />
+      <PageHeader title="Agents" sub="Your ten agents, running in Hermes. Everyone reports to Jordan, and Quinn checks everything before it reaches you." />
       <ErrorNote text={error} />
 
       {head && (
@@ -97,7 +98,7 @@ export default function AgentsPage() {
               <Plus size={14} /> New
             </Button>
           </div>
-          {data?.groups.length === 0 && <Empty title="No groups yet" sub="Try a Content Team: Creative, Growth and Quality." />}
+          {data?.groups.length === 0 && <Empty title="No groups yet" sub="Try a Content Team: Maya, Lux and Quinn." />}
           <div className="space-y-2">
             {data?.groups.map((g) => (
               <div key={g.id} className="flex items-center gap-3 rounded-2xl border border-[#e8eaee] p-3">

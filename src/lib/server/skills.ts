@@ -1,14 +1,49 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { paths } from "./paths";
-import { readJson, updateJson } from "./store";
-import { listSkills } from "./hermes";
-import { getAgents } from "./agents";
+import { profileSkills, readTeam } from "./agents";
 
-// Skills: what Hermes has installed, what each agent's package expects,
-// uploads waiting to be installed, and which agents may use which skill.
+// Each Hermes agent only sees the skills in its own profile folder
+// (~/.hermes/profiles/<agent>/skills). Assigning a skill copies it there; unassigning removes
+// that agent's copy, but only when another copy still exists in a library below, so nothing is lost.
 
+const home = os.homedir();
 const uploads = () => path.join(paths.data, "skill-uploads");
+
+// Places a skill can be copied from, in order of preference.
+function libraries() {
+  const dirs = [path.join(home, ".claude/skills"), path.join(paths.hermesHome, "skills"), uploads()];
+  const synced = path.join(home, ".claude/skills/synced");
+  if (fs.existsSync(synced)) for (const d of fs.readdirSync(synced)) dirs.push(path.join(synced, d));
+  const cache = path.join(home, ".claude/plugins/cache");
+  if (fs.existsSync(cache)) {
+    for (const a of fs.readdirSync(cache))
+      for (const b of safeList(path.join(cache, a)))
+        for (const c of safeList(path.join(cache, a, b))) dirs.push(path.join(cache, a, b, c, "skills"));
+  }
+  return dirs.filter((d) => fs.existsSync(d));
+}
+
+function safeList(dir: string) {
+  try {
+    return fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, d)).isDirectory());
+  } catch {
+    return [];
+  }
+}
+
+function skillsIn(dir: string) {
+  return safeList(dir).filter((d) => fs.existsSync(path.join(dir, d, "SKILL.md")));
+}
+
+function findSource(name: string) {
+  for (const lib of libraries()) {
+    const p = path.join(lib, name);
+    if (fs.existsSync(path.join(p, "SKILL.md"))) return p;
+  }
+  return null;
+}
 
 function safeName(s: string) {
   const n = s.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -16,34 +51,25 @@ function safeName(s: string) {
   return n.slice(0, 60);
 }
 
+const profileDir = (agent: string) => path.join(paths.hermesHome, "profiles", agent, "skills");
+
 export async function skillsOverview() {
-  let installed: Awaited<ReturnType<typeof listSkills>> = [];
-  let error: string | null = null;
-  try {
-    installed = await listSkills();
-  } catch (e) {
-    error = (e as Error).message;
-  }
-  const agents = await getAgents();
-  const assigned = readJson<Record<string, string[]>>("skill-assignments", {});
-  const expected = new Map<string, string[]>();
-  for (const a of agents) for (const s of a.skills) expected.set(s, [...(expected.get(s) ?? []), a.id]);
-  const names = new Set([...installed.map((s) => s.name), ...expected.keys(), ...Object.keys(assigned)]);
-  const installedSet = new Set(installed.map((s) => s.name));
-  const pending = fs.existsSync(uploads()) ? fs.readdirSync(uploads()).filter((d) => fs.statSync(path.join(uploads(), d)).isDirectory()) : [];
-  const skills = [...names].sort().map((name) => ({
-    name,
-    installed: installedSet.has(name),
-    source: installed.find((s) => s.name === name)?.source ?? null,
-    status: installed.find((s) => s.name === name)?.status ?? null,
-    packageAgents: expected.get(name) ?? [],
-    agents: assigned[name] ?? expected.get(name) ?? [],
-    uploaded: pending.includes(name),
-  }));
-  return { skills, pending, error, agents: agents.map((a) => ({ id: a.id, name: a.name, short: a.short, color: a.color })) };
+  const team = readTeam();
+  const agents = team.agents.map((a) => ({ id: a.id, name: a.name, short: a.name, color: a.color }));
+  const byAgent = new Map(team.agents.map((a) => [a.id, new Set(profileSkills(a.id))]));
+  const available = new Set<string>();
+  for (const lib of libraries()) for (const s of skillsIn(lib)) available.add(s);
+  const names = new Set<string>(available);
+  for (const set of byAgent.values()) for (const s of set) names.add(s);
+  const pending = skillsIn(uploads());
+  const skills = [...names].sort().map((name) => {
+    const holders = team.agents.filter((a) => byAgent.get(a.id)?.has(name)).map((a) => a.id);
+    return { name, installed: holders.length > 0, source: available.has(name) ? "library" : "agent only", status: null, packageAgents: [] as string[], agents: holders, uploaded: pending.includes(name) };
+  });
+  return { skills, pending: [] as string[], error: null as string | null, agents };
 }
 
-// Saves an uploaded skill folder (files with relative paths) for review before install.
+// Saves an uploaded skill folder into the dashboard's library. Assign it to agents afterwards.
 export function saveUpload(name: string, files: { path: string; content: Buffer }[]) {
   const n = safeName(name);
   if (!files.length) throw new Error("Choose a skill folder or a SKILL.md file.");
@@ -64,49 +90,41 @@ export function saveUpload(name: string, files: { path: string; content: Buffer 
   return n;
 }
 
-// Copies an uploaded skill into Hermes's local skills folder.
 export function installUpload(name: string) {
-  const n = safeName(name);
-  const src = path.join(uploads(), n);
-  if (!fs.existsSync(src)) throw new Error("Upload not found.");
-  const dest = path.join(paths.hermesHome, "skills", n);
-  if (fs.existsSync(dest)) throw new Error(`Hermes already has a skill named ${n}. Rename the upload or remove the old one first.`);
-  fs.cpSync(src, dest, { recursive: true });
-  fs.rmSync(src, { recursive: true, force: true });
-  return n;
+  return safeName(name);
 }
 
 export function discardUpload(name: string) {
   fs.rmSync(path.join(uploads(), safeName(name)), { recursive: true, force: true });
 }
 
+// Gives exactly these agents the skill: copies it to new ones, removes it from the rest.
 export function assignSkill(name: string, agents: string[]) {
-  return updateJson<Record<string, string[]>>("skill-assignments", {}, (d) => {
-    d[name] = [...new Set(agents)];
-  });
-}
-
-// Skills to force-load on an agent's cards: what you assigned on the Skills page,
-// or the agent package's list when you have not assigned anything yet. Only
-// skills Hermes actually has installed are passed, so a card never fails to start.
-export async function skillsForAgent(agentId: string) {
-  const assigned = readJson<Record<string, string[]>>("skill-assignments", {});
-  const agent = (await getAgents()).find((a) => a.id === agentId);
-  const names = new Set<string>();
-  for (const s of agent?.skills ?? []) if (!(s in assigned)) names.add(s);
-  for (const [s, agents] of Object.entries(assigned)) if (agents.includes(agentId)) names.add(s);
-  let installed: Set<string>;
-  try {
-    installed = new Set((await listSkills()).filter((s) => s.status !== "disabled").map((s) => s.name));
-  } catch {
-    return [];
+  const n = safeName(name);
+  const team = readTeam();
+  const wanted = new Set(agents.filter((a) => team.agents.some((t) => t.id === a)));
+  const source = findSource(n) ?? team.agents.map((a) => path.join(profileDir(a.id), n)).find((p) => fs.existsSync(path.join(p, "SKILL.md"))) ?? null;
+  if (!source && wanted.size) throw new Error(`No copy of ${n} was found to give out.`);
+  const libraryCopy = findSource(n);
+  const result: Record<string, "added" | "removed" | "kept"> = {};
+  for (const a of team.agents) {
+    const dest = path.join(profileDir(a.id), n);
+    const has = fs.existsSync(path.join(dest, "SKILL.md"));
+    if (wanted.has(a.id) && !has) {
+      fs.mkdirSync(profileDir(a.id), { recursive: true });
+      fs.cpSync(source!, dest, { recursive: true, dereference: true, filter: (p) => !/(^|\/)(node_modules|\.git|__pycache__|\.DS_Store)(\/|$)/.test(p) });
+      result[a.id] = "added";
+    } else if (!wanted.has(a.id) && has) {
+      // Only remove when a library copy remains, so the skill can always be given back.
+      if (libraryCopy && path.resolve(libraryCopy) !== path.resolve(dest)) {
+        fs.rmSync(dest, { recursive: true, force: true });
+        result[a.id] = "removed";
+      } else result[a.id] = "kept";
+    }
   }
-  return [...names].filter((n) => installed.has(n));
+  return result;
 }
 
 export function skillsFor(agentId: string) {
-  const assigned = readJson<Record<string, string[]>>("skill-assignments", {});
-  return Object.entries(assigned)
-    .filter(([, a]) => a.includes(agentId))
-    .map(([n]) => n);
+  return profileSkills(agentId);
 }

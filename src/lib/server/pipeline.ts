@@ -2,9 +2,8 @@ import { paths } from "./paths";
 import { readJson, updateJson, now } from "./store";
 import { getSettings, requireRuns } from "./settings";
 import * as hermes from "./hermes";
-import { getAgents, rosterForPrompt } from "./agents";
+import { getAgents, qaId, rosterForPrompt } from "./agents";
 import { logProject } from "./obsidian";
-import { skillsForAgent } from "./skills";
 
 // Inbox to Shipped. Four stages on top of the real Hermes board:
 // capture (idea parked as a blocked card) -> gate (plan waiting for Marcus)
@@ -188,7 +187,6 @@ export async function approve(id: string) {
       body: `${step.instructions}\n\nPart of: ${item.title}\nOriginal idea: ${item.idea}`,
       assignee: step.agent,
       parents: step.dependsOn.map((d) => stepTasks[d]).filter(Boolean),
-      skills: await skillsForAgent(step.agent),
       blocked: true,
     });
     stepTasks[step.key] = task.id;
@@ -196,9 +194,8 @@ export async function approve(id: string) {
   const qc = await hermes.createTask({
     title: `Quality check: ${item.title}`.slice(0, 120),
     body: `Check every deliverable for "${item.title}" against the approved plan before it ships. List what passes, what fails and what is missing.\n\nPlan:\n${item.plan.summary}`,
-    assignee: "rhquality",
+    assignee: qaId(),
     parents: Object.values(stepTasks),
-    skills: await skillsForAgent("rhquality"),
     blocked: true,
   });
   await hermes.comment(id, `Approved by Marcus. ${item.plan.steps.length} steps plus a quality check.${runs ? "" : " Waiting for agent runs to be turned on."}`);
@@ -276,7 +273,7 @@ export async function listPipeline(): Promise<{ items: PipelineView[]; offline: 
     });
     if (item.qcTask) {
       const t = byId.get(item.qcTask);
-      steps.push({ key: "qc", title: "Quality check", agent: "rhquality", instructions: "Checks every deliverable before it ships.", dependsOn: [], taskId: item.qcTask, status: t?.status ?? "unknown", result: t?.result ?? null });
+      steps.push({ key: "qc", title: "Quality check", agent: qaId(), instructions: "Checks every deliverable before it ships.", dependsOn: [], taskId: item.qcTask, status: t?.status ?? "unknown", result: t?.result ?? null });
     }
     const done = steps.filter((s) => s.status === "done").length;
     items.push({ ...item, steps, progress: steps.length ? Math.round((done / steps.length) * 100) : 0 });

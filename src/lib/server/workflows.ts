@@ -2,7 +2,6 @@ import { readJson, updateJson, newId, now } from "./store";
 import { getSettings, requireRuns } from "./settings";
 import * as hermes from "./hermes";
 import { getAgents, rosterForPrompt } from "./agents";
-import { skillsForAgent } from "./skills";
 
 // Saved, repeatable multi-step jobs. Running one creates linked Hermes cards,
 // the same way an approved pipeline plan does.
@@ -75,7 +74,6 @@ export async function runWorkflow(id: string) {
       body: `${s.instructions}\n\nWorkflow: ${w.name} (step ${i + 1} of ${w.steps.length})`,
       assignee: s.agent,
       parents: s.after.map((n) => ids[n]).filter(Boolean),
-      skills: await skillsForAgent(s.agent),
       blocked: !runs,
     });
     ids.push(t.id);

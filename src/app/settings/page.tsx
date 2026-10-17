@@ -11,7 +11,6 @@ type Data = { settings: { agentRuns: boolean; headAgent: string }; paths: Record
 const labels: Record<string, string> = {
   hermesBin: "Hermes",
   board: "Pipeline board",
-  agentsDir: "Agent package",
   crmDir: "CRM folder",
   crmUrl: "CRM address",
   vault: "Obsidian vault",
@@ -71,7 +70,7 @@ export default function SettingsPage() {
       <Card className="p-5 mb-4">
         <p className="font-semibold mb-1">Head agent</p>
         <p className="text-sm text-[#6b7280]">
-          {data?.settings.headAgent ?? "rhoperations"} (Executive / Operations Manager). It is the default chat, writes pipeline plans and sums up group chats.
+          Jordan, your COO ({data?.settings.headAgent ?? "jordan"}). Jordan is the default chat, writes pipeline plans and sums up group chats.
         </p>
       </Card>
 

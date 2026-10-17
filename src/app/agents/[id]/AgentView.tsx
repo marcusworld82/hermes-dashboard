@@ -11,6 +11,7 @@ type Agent = {
   id: string;
   name: string;
   short: string;
+  title: string;
   color: string;
   description: string;
   isHead: boolean;
@@ -59,12 +60,13 @@ export function AgentView({ params }: { params: Promise<{ id: string }> }) {
                 <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">{a.name}</h1>
                 {a.isHead && <Crown size={18} className="text-amber-500" />}
               </div>
+              <p className="text-sm font-medium text-[#9ca3af]">{a.title}</p>
               <p className="text-sm text-[#6b7280] mt-1 leading-relaxed">{a.description}</p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 <Badge tone={a.gateway === "running" ? "green" : "gray"}>{a.gateway === "running" ? "Online" : "Offline"}</Badge>
                 <Badge>Hermes id: {a.id}</Badge>
                 {a.liveModel && <Badge tone="blue">{a.liveModel}</Badge>}
-                <Badge>{a.isHead ? "Head agent" : `Reports to ${a.reportsTo}`}</Badge>
+                <Badge>{a.isHead ? "Head agent" : `Reports to ${a.reportsTo === "jordan" ? "Jordan" : a.reportsTo}`}</Badge>
               </div>
             </div>
           </div>
@@ -74,7 +76,7 @@ export function AgentView({ params }: { params: Promise<{ id: string }> }) {
 
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="p-5">
-              <h2 className="font-semibold mb-3">How it works</h2>
+              <h2 className="font-semibold mb-3">Its job</h2>
               <ol className="space-y-2 text-sm text-[#374151] list-decimal pl-5">
                 {a.workflow.map((w, i) => (
                   <li key={i} className="leading-relaxed">
@@ -110,7 +112,7 @@ export function AgentView({ params }: { params: Promise<{ id: string }> }) {
               )}
               {a.modelNote && (
                 <>
-                  <p className="text-xs font-medium text-[#6b7280] mt-4 mb-1">Model plan</p>
+                  <p className="text-xs font-medium text-[#6b7280] mt-4 mb-1">Models</p>
                   <p className="text-sm leading-relaxed">{a.modelNote}</p>
                 </>
               )}

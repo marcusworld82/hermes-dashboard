@@ -19,9 +19,9 @@ const TEMPLATES: Draft[] = [
     description: "Plan, write and check a week of posts.",
     schedule: "Every Monday 9am",
     steps: [
-      { title: "Pick this week's topics from recent wins and questions", agent: "rhgrowth", instructions: "List 5 topics with the audience and the proof for each.", after: [] },
-      { title: "Write hooks, captions and carousel outlines", agent: "rhcreative", instructions: "Follow the Social Media specs in the vault. One carousel, two reels, two singles.", after: [0] },
-      { title: "Review against brand and platform specs", agent: "rhquality", instructions: "Check sizes, safe zones, hook formula and the 3-color rule. List fixes.", after: [1] },
+      { title: "Pick this week's topics from recent wins and questions", agent: "maya", instructions: "List 5 topics with the audience and the proof for each.", after: [] },
+      { title: "Write hooks, captions and carousel outlines", agent: "maya", instructions: "Follow the Social Media specs in the vault. One carousel, two reels, two singles.", after: [0] },
+      { title: "Review against brand and platform specs", agent: "quinn", instructions: "Check sizes, safe zones, hook formula and the 3-color rule. List fixes.", after: [1] },
     ],
   },
   {
@@ -29,9 +29,9 @@ const TEMPLATES: Draft[] = [
     description: "Find prospects, research them and draft first messages for approval.",
     schedule: "",
     steps: [
-      { title: "Find 20 sourced prospects for the current offer", agent: "rhgrowth", instructions: "Real businesses only, with the observation that makes each a fit.", after: [] },
-      { title: "Draft one personal opener per prospect", agent: "rhgrowth", instructions: "No sending. Drafts go to the CRM for Marcus to approve.", after: [0] },
-      { title: "Check drafts for tone, facts and opt-out rules", agent: "rhquality", instructions: "Flag any claim without a source.", after: [1] },
+      { title: "Find 20 sourced prospects for the current offer", agent: "rico", instructions: "Real businesses only, with the observation that makes each a fit.", after: [] },
+      { title: "Draft one personal opener per prospect", agent: "rico", instructions: "No sending. Drafts go to the CRM for Marcus to approve.", after: [0] },
+      { title: "Check drafts for tone, facts and opt-out rules", agent: "quinn", instructions: "Flag any claim without a source.", after: [1] },
     ],
   },
   {
@@ -39,10 +39,10 @@ const TEMPLATES: Draft[] = [
     description: "Brief to a reviewed first version of a client site.",
     schedule: "",
     steps: [
-      { title: "Write the site brief and page list", agent: "rhoperations", instructions: "Goals, pages, must-have content, deadline.", after: [] },
-      { title: "Write page copy and pick visuals", agent: "rhcreative", instructions: "Copy for each page in the brief.", after: [0] },
-      { title: "Build the first version", agent: "rhtechnical", instructions: "Build from the brief and copy. Share a preview link.", after: [0, 1] },
-      { title: "Test on desktop and phone", agent: "rhquality", instructions: "Broken links, layout, speed, forms.", after: [2] },
+      { title: "Write the site brief and page list", agent: "jordan", instructions: "Goals, pages, must-have content, deadline.", after: [] },
+      { title: "Write page copy and pick visuals", agent: "maya", instructions: "Copy for each page in the brief.", after: [0] },
+      { title: "Build the first version", agent: "kai", instructions: "Build from the brief and copy. Share a preview link.", after: [0, 1] },
+      { title: "Test on desktop and phone", agent: "quinn", instructions: "Broken links, layout, speed, forms.", after: [2] },
     ],
   },
 ];

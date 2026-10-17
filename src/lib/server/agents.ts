@@ -3,17 +3,18 @@ import path from "node:path";
 import { paths } from "./paths";
 import { listProfiles, type Profile } from "./hermes";
 
-// Agent roster comes from the Lazy Money Agents package (roles, skills, workflows)
-// joined with the live Hermes profile list (model, gateway status).
+// The roster comes from team.json (built from Marcus's interview, applied to Hermes by
+// scripts/build-team.py), joined with the live Hermes profile list (model, gateway status).
 
 export type Agent = {
-  id: string; // Hermes profile id, e.g. rhgrowth
-  packageId: string; // package folder id, e.g. rh-growth
-  name: string;
+  id: string; // Hermes profile id, e.g. maya
+  name: string; // e.g. Maya
   short: string;
+  title: string; // e.g. Social Media Manager
   description: string;
   reportsTo: string | null;
   isHead: boolean;
+  isQa: boolean;
   color: string;
   skills: string[];
   knowledge: string[];
@@ -27,67 +28,39 @@ export type Agent = {
   installed: boolean;
 };
 
-type ManifestRole = {
+type TeamAgent = {
   id: string;
+  name: string;
   title: string;
+  color: string;
   description: string;
-  reports_to?: string;
-  skills?: string[];
-  knowledge?: string[];
-  tools?: string;
-  model?: string;
-  workflow?: string[] | string;
-  output?: string | string[];
-  boundary?: string | string[];
+  provider: string;
+  model: string;
+  fallback: { provider: string; model: string };
+  claudeDesk?: string;
+  tools: string;
+  skills: string[];
+  job: string[];
+  extraKnowledge?: string[];
 };
 
-const HEAD = "rh-operations";
+export type TeamGroup = { name: string; members: string[]; lead: string };
+type Team = { head: string; qa?: string; agents: TeamAgent[]; groups: TeamGroup[] };
 
-const short: Record<string, string> = {
-  "rh-operations": "Operator",
-  "rh-growth": "Growth",
-  "rh-creative": "Creative",
-  "rh-technical": "Builder",
-  "rh-quality": "Quality",
-  "rh-finance": "Finance",
-  "personal-trading": "Trading",
-  "treasure-manager": "Treasure",
-};
-
-const colors: Record<string, string> = {
-  "rh-operations": "#1a1d24",
-  "rh-growth": "#10b981",
-  "rh-creative": "#8b5cf6",
-  "rh-technical": "#3b82f6",
-  "rh-quality": "#f59e0b",
-  "rh-finance": "#0ea5e9",
-  "personal-trading": "#ef4444",
-  "treasure-manager": "#ec4899",
-};
-
-const text = (v: string | string[] | undefined) => (Array.isArray(v) ? v.join(" ") : v ?? "");
-
-export function hermesIdFor(packageId: string) {
-  return packageId.replace(/-/g, "");
-}
-
-function readManifest(): ManifestRole[] {
+export function readTeam(): Team {
   try {
-    const file = path.join(paths.agentsDir, "03-Sources-and-Skills/agent-manifest.json");
-    return (JSON.parse(fs.readFileSync(file, "utf8")).roles ?? []) as ManifestRole[];
+    return JSON.parse(fs.readFileSync(path.join(process.cwd(), "team.json"), "utf8")) as Team;
   } catch {
-    return [];
+    return { head: "jordan", agents: [], groups: [] };
   }
 }
 
-function displayName(packageId: string, fallback: string) {
-  try {
-    const yaml = fs.readFileSync(path.join(paths.agentsDir, "02-Agents", packageId, "profile.yaml"), "utf8");
-    const m = yaml.match(/^display_name:\s*"?(.+?)"?\s*$/m);
-    return m ? m[1] : fallback;
-  } catch {
-    return fallback;
-  }
+export function headId() {
+  return readTeam().head;
+}
+
+export function qaId() {
+  return readTeam().qa ?? "quinn";
 }
 
 // "hermes profile list" takes about two seconds, so keep it for 30 seconds.
@@ -113,31 +86,47 @@ function profileModel(id: string) {
   }
 }
 
+// Skills Marcus added to this agent: top-level folders with a SKILL.md in the profile's skills
+// folder. Hermes's own bundled skills sit in category subfolders and are left out.
+export function profileSkills(id: string) {
+  const dir = path.join(paths.hermesHome, "profiles", id, "skills");
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((d) => fs.existsSync(path.join(dir, d, "SKILL.md")))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+const providerLabel = (p: string) => (p === "openai-codex" ? "Codex (ChatGPT plan)" : p === "openrouter" ? "OpenRouter" : p);
+
 export async function getAgents(): Promise<Agent[]> {
-  const roles = readManifest();
+  const team = readTeam();
   const profiles = await cachedProfiles();
   const byId = new Map(profiles.map((p) => [p.id, p]));
-  return roles.map((r) => {
-    const id = hermesIdFor(r.id);
-    const live = byId.get(id);
-    const workflow = Array.isArray(r.workflow) ? r.workflow : r.workflow ? [r.workflow] : [];
+  return team.agents.map((a) => {
+    const live = byId.get(a.id);
+    const isHead = a.id === team.head;
     return {
-      id,
-      packageId: r.id,
-      name: displayName(r.id, r.title),
-      short: short[r.id] ?? r.title.split(" ")[0],
-      description: r.description,
-      reportsTo: r.id === HEAD ? null : hermesIdFor(r.reports_to ?? HEAD),
-      isHead: r.id === HEAD,
-      color: colors[r.id] ?? "#6b7280",
-      skills: r.skills ?? [],
-      knowledge: r.knowledge ?? [],
-      tools: r.tools ?? "",
-      modelNote: r.model ?? "",
-      workflow,
-      output: text(r.output),
-      boundary: text(r.boundary),
-      liveModel: profileModel(id) ?? live?.model ?? null,
+      id: a.id,
+      name: a.name,
+      short: a.name,
+      title: a.title,
+      description: a.description,
+      reportsTo: isHead ? null : team.head,
+      isHead,
+      isQa: a.id === (team.qa ?? "quinn"),
+      color: a.color,
+      skills: profileSkills(a.id),
+      knowledge: a.extraKnowledge ?? [],
+      tools: a.tools,
+      modelNote: `${providerLabel(a.provider)}: ${a.model}. Backup: ${a.fallback.model}.${a.claudeDesk ? ` Hands ${a.claudeDesk} to the Claude desk (Claude Code on this Mac).` : ""}`,
+      workflow: a.job,
+      output: "",
+      boundary: "",
+      liveModel: profileModel(a.id) ?? live?.model ?? null,
       gateway: live?.gateway ?? null,
       installed: !!live,
     };
@@ -149,23 +138,15 @@ export async function getAgent(id: string) {
   const agent = agents.find((a) => a.id === id);
   if (!agent) return null;
   let soul = "";
-  let roleGuide = "";
   try {
     soul = fs.readFileSync(path.join(paths.hermesHome, "profiles", id, "SOUL.md"), "utf8");
-  } catch {
-    try {
-      soul = fs.readFileSync(path.join(paths.agentsDir, "02-Agents", agent.packageId, "SOUL.md"), "utf8");
-    } catch {}
-  }
-  try {
-    roleGuide = fs.readFileSync(path.join(paths.agentsDir, "02-Agents", agent.packageId, "ROLE-GUIDE.md"), "utf8");
   } catch {}
-  return { agent, soul, roleGuide };
+  return { agent, soul, roleGuide: "" };
 }
 
 export function rosterForPrompt(agents: Agent[]) {
   return agents
-    .filter((a) => a.id !== "personaltrading")
-    .map((a) => `- ${a.id} (${a.name}): ${a.description}`)
+    .filter((a) => a.id !== "nash")
+    .map((a) => `- ${a.id} (${a.name}, ${a.title}): ${a.description}`)
     .join("\n");
 }

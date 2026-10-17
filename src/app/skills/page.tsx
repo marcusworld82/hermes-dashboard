@@ -35,7 +35,7 @@ export default function SkillsPage() {
     <Page wide>
       <PageHeader
         title="Skills"
-        sub="What your agents know how to do. Upload a skill folder, install it into Hermes, then choose which agents use it."
+        sub="Each agent only sees its own skills. Tap a skill and pick the agents who should have it. Uploads land in your library first."
         action={
           <Button onClick={() => setUpload(true)}>
             <Upload size={16} /> <span className="hidden sm:inline">Upload skill</span>
@@ -68,8 +68,8 @@ export default function SkillsPage() {
           onChange={setFilter}
           options={[
             { id: "all", label: "All", count: data?.skills.length },
-            { id: "installed", label: "Installed", count: data?.skills.filter((s) => s.installed).length },
-            { id: "missing", label: "Not installed", count: data?.skills.filter((s) => !s.installed).length },
+            { id: "installed", label: "Given to agents", count: data?.skills.filter((s) => s.installed).length },
+            { id: "missing", label: "Library only", count: data?.skills.filter((s) => !s.installed).length },
           ]}
         />
         <div className="relative sm:ml-auto sm:w-64">
@@ -83,7 +83,7 @@ export default function SkillsPage() {
           <Card key={s.name} className="p-3.5" onClick={() => setAssign(s)}>
             <div className="flex items-center gap-2">
               <p className="font-medium text-sm truncate flex-1">{s.name}</p>
-              <Badge tone={s.installed ? "green" : "amber"}>{s.installed ? "Installed" : "Not installed"}</Badge>
+              <Badge tone={s.installed ? "green" : "gray"}>{s.installed ? `${s.agents.length} ${s.agents.length === 1 ? "agent" : "agents"}` : "In library"}</Badge>
             </div>
             <div className="flex items-center gap-1 mt-2 min-h-5">
               {s.agents.map((a) => (
@@ -111,8 +111,7 @@ function Assign({ skill, agents, onDone }: { skill: Skill; agents: Agent[]; onDo
   return (
     <div>
       <p className="text-sm text-[#6b7280] mb-3">
-        {skill.installed ? `Installed in Hermes (${skill.source ?? "local"}).` : "Not installed in Hermes yet. Agents can be assigned now and will use it once installed."}
-        {skill.packageAgents.length > 0 && ` Your agent package lists it for ${skill.packageAgents.length} agent(s).`}
+        Pick who should have this skill. Saving copies it into each chosen agent in Hermes and removes it from the others. Your library copy always stays.
       </p>
       <div className="grid grid-cols-2 gap-2 mb-4">
         {agents.map((a) => {
@@ -180,7 +179,7 @@ function UploadForm({ onDone }: { onDone: () => void }) {
   return (
     <div>
       <ErrorNote text={msg} />
-      <p className="text-sm text-[#6b7280] mb-4">A skill is a folder with a SKILL.md file and any helper files. It is saved here first, then you press Install to add it to Hermes.</p>
+      <p className="text-sm text-[#6b7280] mb-4">A skill is a folder with a SKILL.md file and any helper files. It is saved to your library, then you pick which agents get it.</p>
       <div className="grid grid-cols-2 gap-2 mb-4">
         <label className="rounded-2xl border border-dashed border-[#d1d5db] p-4 text-center text-sm cursor-pointer hover:bg-[#fafbfc]">
           <input

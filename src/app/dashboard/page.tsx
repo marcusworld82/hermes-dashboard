@@ -134,7 +134,7 @@ export default function DashboardPage() {
               View all <ArrowUpRight size={14} />
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             {data?.agents.map((a) => (
               <Link key={a.id} href={`/agents/${a.id}`} className="rounded-2xl border border-[#e8eaee] p-3 bg-[#fafbfc] hover:bg-white hover:shadow-sm transition-all min-w-0">
                 <div className="flex items-center justify-between mb-2">
@@ -145,7 +145,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] text-[#9ca3af] truncate">{a.isHead ? "Head agent" : a.gateway === "running" ? "Online" : "Offline"}</p>
               </Link>
             ))}
-            {!data && Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-[#f4f5f7] animate-pulse" />)}
+            {!data && Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-[#f4f5f7] animate-pulse" />)}
           </div>
           {top && (
             <p className="text-xs text-[#6b7280] mt-4">
