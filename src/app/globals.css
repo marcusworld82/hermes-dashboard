@@ -69,13 +69,19 @@ body {
   border-radius: 99px;
 }
 /* ---------- app-like behavior ---------- */
+/* "clip" locks sideways movement without turning the body into its own scroll box.
+   "hidden" on both html and body made the body a scroll box, and with overscroll
+   turned off the mouse wheel and trackpad could no longer scroll the page. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
-  overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
+}
+
+html {
+  overscroll-behavior-y: none;
 }
 
 :root {
