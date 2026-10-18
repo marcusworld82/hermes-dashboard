@@ -134,3 +134,14 @@ export async function sendToBridge(id: string, prompt: string, model?: string) {
   if (!state.ready) throw new Error(state.note);
   return def.send(prompt, model);
 }
+
+// Claude desk for jobs that need specific tools (web search for news, reading uploaded images for Clone).
+// Only the named tools are available; everything else stays off.
+export function claudeSend(prompt: string, opts: { tools?: string[]; dirs?: string[] } = {}) {
+  if (!fs.existsSync(paths.claudeBin)) return Promise.reject(new Error(`Claude Code not found at ${paths.claudeBin}`));
+  const args = ["-p", "--output-format", "text"];
+  args.push("--tools", opts.tools?.length ? opts.tools.join(",") : "");
+  if (opts.tools?.length) args.push("--allowedTools", ...opts.tools);
+  if (opts.dirs?.length) args.push("--add-dir", ...opts.dirs);
+  return cli(paths.claudeBin, args, prompt, 300_000);
+}
