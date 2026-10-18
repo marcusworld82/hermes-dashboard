@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { paths } from "./paths";
+import { paths } from "./paths.ts";
 
 // Small JSON file store for dashboard-only state (plans, threads, groups, workflows, settings).
 // Hermes owns tasks and agents; this only holds what Hermes has no place for.

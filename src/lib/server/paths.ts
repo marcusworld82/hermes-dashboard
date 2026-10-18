@@ -15,5 +15,5 @@ export const paths = {
   vaultPipelineFolder: process.env.OBSIDIAN_PIPELINE_FOLDER || "Hermes/Pipeline",
   claudeBin: process.env.CLAUDE_BIN || path.join(home, ".local/bin/claude"),
   codexBin: process.env.CODEX_BIN || path.join(home, ".local/bin/codex"),
-  data: path.join(process.cwd(), "data"),
+  data: process.env.HERMES_DATA_DIR || path.join(process.cwd(), "data"),
 };
