@@ -58,8 +58,7 @@ export async function quote(id: HfModelId, prompt: string, size: Size, fetcher: 
   };
   if (q.usd === null && q.credits === null && !q.description) throw new Error("Higgsfield didn't return a price. Nothing was generated.");
   quotes.set(q.quoteId, q);
-  const { body: _b, ...pub } = q;
-  return pub;
+  return { quoteId: q.quoteId, model: q.model, credits: q.credits, usd: q.usd, description: q.description, expiresAt: q.expiresAt };
 }
 
 type GenOpts = { fetcher?: typeof fetch; sleep?: (ms: number) => Promise<void> };

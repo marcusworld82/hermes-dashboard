@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { findBanned, stripDashes } from "../carousel/banned.ts";
-import { HOOK_FORMULAS, STRUCTURES, type BrandKit, type Carousel, type CloneSpec, type Slide } from "../carousel/types.ts";
+import { HOOK_FORMULAS, type BrandKit, type Carousel, type CloneSpec, type Slide } from "../carousel/types.ts";
 import { FONT_IDS } from "../carousel/fonts.ts";
 
 // Writes carousel copy through Claude on this Mac (Claude desk). Every step returns a patch for the carousel.
@@ -71,7 +71,7 @@ function prompt(step: Step, car: Carousel, opts: { index?: number }, d: Deps): s
     case "hooks":
       return `${base}\n\nWrite 5 cover hooks for this carousel. Each must use one of these formulas: ${HOOK_FORMULAS.join(" | ")}. Under 70 characters each.\nReply with JSON only: {"hooks": [{"text": "...", "formula": "one of the formulas exactly"}]}`;
     case "slides":
-      return `${base}\n\nChosen hook: ${car.hook || car.title}\nWrite ${count} slide${count > 1 ? "s" : ""} following this flow: ${STRUCTURE_FLOW[car.inputs.structure] ?? STRUCTURE_FLOW.Listicle}.\n${count > 1 ? `Slide 1 is the cover and uses the hook. The last slide is the call to action, matching the goal "${car.inputs.goal}" (reach: share or send, trust: follow, saves: save this, sales: DM a keyword, dms: comment a keyword).` : "This is a single post: put the whole idea on one slide."}\nKeep each headline under 60 characters and each body under 220 characters so it fits the safe zone. Bodies can be empty on the cover.\nReply with JSON only: {"slides": [{"headline": "...", "body": "..."}]}`;
+      return `${base}\n\nChosen hook: ${car.hook || car.title}\nWrite ${count} slide${count > 1 ? "s" : ""} following this flow: ${STRUCTURE_FLOW[car.inputs.structure] ?? STRUCTURE_FLOW.Listicle}.\n${count > 1 ? `Slide 1 is the cover and uses the hook. The last slide is the call to action, matching the goal "${car.inputs.goal}" (reach: share or send, trust: follow, saves: save this, sales: DM a keyword, dms: comment a keyword).` : "This is a single post: put the whole idea on one slide."}\nKeep each headline under 60 characters and each body under 220 characters so it fits the safe zone. Wrap the single most important word of each headline in *asterisks* so the design can accent it. Bodies can be empty on the cover.\nReply with JSON only: {"slides": [{"headline": "...", "body": "..."}]}`;
     case "slide": {
       const i = opts.index ?? 0;
       const s = car.slides[i];

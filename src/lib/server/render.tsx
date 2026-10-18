@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ImageResponse } from "next/og";
+/* eslint-disable @next/next/no-img-element -- next/og draws plain <img> elements */
 import type { ReactElement, ReactNode } from "react";
 import { canvas, safeBox, fitText } from "@/lib/carousel/layout";
 import { FONTS, fontById, lineHeightOf } from "@/lib/carousel/fonts";
@@ -84,7 +85,7 @@ function Placeholder(p: { w: number; h: number; x: number; y: number; color: str
 }
 
 function Img(p: { src: string; x: number; y: number; w: number; h: number; radius?: number; border?: string }) {
-  return <img src={p.src} width={p.w} height={p.h} style={{ position: "absolute", left: p.x, top: p.y, width: p.w, height: p.h, objectFit: "cover", borderRadius: p.radius ?? 0, ...(p.border ? { border: p.border } : {}) }} />;
+  return <img alt="" src={p.src} width={p.w} height={p.h} style={{ position: "absolute", left: p.x, top: p.y, width: p.w, height: p.h, objectFit: "cover", borderRadius: p.radius ?? 0, ...(p.border ? { border: p.border } : {}) }} />;
 }
 
 function Handle(p: { kit: BrandKit; color: string; H: number; pill?: boolean }) {
@@ -128,7 +129,8 @@ function creative(ctx: Ctx, base: CreativeStyle): ReactElement {
   const full = st.image === "full" || st.image === "framed";
   const justify = full ? "flex-end" : st.image === "below" ? "flex-start" : "center";
   const imgTop = Math.round(box.y + Math.min(usedH, textH) + 40);
-  const imgH = H - 120 - imgTop;
+  // The photo stops above the handle so the handle never sits on the image.
+  const imgH = (slide.showHandle ? H - 180 - HANDLE_ROOM - 8 : H - 120) - imgTop;
 
   let body: ReactNode = slide.body ? <Body text={slide.body} px={bodyPx} font={st.body} color={st.text} align={st.align} width={box.w - (hasDeco("dashed-body") || hasDeco("tape-card") ? 80 : 0)} /> : null;
   if (body && hasDeco("dashed-body")) body = <div style={{ display: "flex", border: `3px dashed ${st.accent}`, borderRadius: 12, padding: "24px 36px", marginTop: 32 }}>{body}</div>;
@@ -179,7 +181,7 @@ function screenshot(ctx: Ctx): ReactElement {
     <div style={{ width: W, height: H, display: "flex", backgroundColor: pal.bg, position: "relative" }}>
       <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, display: "flex", flexDirection: "column", justifyContent: "center" }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 36 }}>
-          {avatar ? <img src={avatar} width={104} height={104} style={{ width: 104, height: 104, borderRadius: 52, objectFit: "cover" }} />
+          {avatar ? <img alt="" src={avatar} width={104} height={104} style={{ width: 104, height: 104, borderRadius: 52, objectFit: "cover" }} />
             : <div style={{ width: 104, height: 104, borderRadius: 52, backgroundColor: kit.colors.accent, color: "#121212", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Inter", fontWeight: 800, fontSize: 40 }}>{kit.displayName.split(" ").map((s) => s[0]).join("").slice(0, 2)}</div>}
           <div style={{ display: "flex", flexDirection: "column", marginLeft: 24 }}>
             <div style={{ display: "flex", alignItems: "center", fontFamily: "Inter", fontWeight: 800, fontSize: 40, color: pal.text }}>{kit.displayName}<Check badge={car.inputs.badge} size={38} /></div>
@@ -187,7 +189,7 @@ function screenshot(ctx: Ctx): ReactElement {
           </div>
         </div>
         <div style={{ display: "flex", fontFamily: "Inter", fontSize: px, lineHeight: 1.3, color: pal.text, whiteSpace: "pre-wrap" }}>{plain(text)}</div>
-        {img && <img src={img} width={box.w} height={imgH} style={{ width: box.w, height: imgH, objectFit: "cover", borderRadius: 28, marginTop: 40 }} />}
+        {img && <img alt="" src={img} width={box.w} height={imgH} style={{ width: box.w, height: imgH, objectFit: "cover", borderRadius: 28, marginTop: 40 }} />}
         {!img && imgH > 0 && <div style={{ display: "flex", width: box.w, height: imgH, marginTop: 40, border: `4px dashed ${pal.sub}`, borderRadius: 28, alignItems: "center", justifyContent: "center", color: pal.sub, fontFamily: "Inter", fontSize: 32 }}>Add an image</div>}
       </div>
     </div>
@@ -305,7 +307,7 @@ function editorial(ctx: Ctx): ReactElement {
       {main ? <Img src={main} x={0} y={0} w={W} h={H} /> : <Placeholder x={80} y={420} w={W - 160} h={360} color={textC} preview={ctx.preview} label="Main photo" />}
       <div style={{ position: "absolute", left: 0, top: 0, width: W, height: H, display: "flex", backgroundImage: `linear-gradient(180deg, rgba(0,0,0,${(slide.dim / 400).toFixed(2)}) 0%, rgba(0,0,0,${(slide.dim / 100).toFixed(2)}) 75%)` }} />
       {(inset || ctx.preview) && (inset
-        ? <img src={inset} width={insetSize} height={insetSize} style={{ position: "absolute", left: box.x + 20, top: box.y, width: insetSize, height: insetSize, borderRadius: insetSize / 2, objectFit: "cover", border: "8px solid #FFFFFF" }} />
+        ? <img alt="" src={inset} width={insetSize} height={insetSize} style={{ position: "absolute", left: box.x + 20, top: box.y, width: insetSize, height: insetSize, borderRadius: insetSize / 2, objectFit: "cover", border: "8px solid #FFFFFF" }} />
         : <div style={{ position: "absolute", left: box.x + 20, top: box.y, width: insetSize, height: insetSize, borderRadius: insetSize / 2, border: "8px solid #FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", fontFamily: "Inter", fontSize: 28, opacity: 0.6 }}>Inset photo</div>)}
       <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: textH, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
         <div style={{ display: "flex", width: 360, height: 3, backgroundColor: textC, marginBottom: 14 }} />

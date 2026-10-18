@@ -30,7 +30,7 @@ export function newSlide(partial: Partial<Slide> = {}): Slide {
 export function createCarousel(partial: Partial<Carousel>): Carousel {
   const now = new Date().toISOString();
   const car: Carousel = {
-    id: newId("car"), brandId: "lyfe", mode: "screenshot", template: "screenshot", size: "3:4", theme: "dark", useBrandColors: true, title: "",
+    id: newId("car"), brandId: "lyfe", mode: "screenshot", template: "screenshot", size: "3:4", theme: "dark", useBrandColors: false, title: "",
     ideas: [], news: [], hooks: [], hook: "", slides: [], caption: "", clone: { cover: null, inner: [], spec: null }, flags: [], status: "draft",
     createdAt: now, updatedAt: now,
     ...partial,

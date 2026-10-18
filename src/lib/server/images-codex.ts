@@ -8,6 +8,9 @@ import type { Size } from "../carousel/types.ts";
 
 // Default image route: Codex's built-in image tool on Marcus's ChatGPT plan. No API key and no per-image charge.
 // Codex saves each run's images in ~/.codex/generated_images/<thread id>/; the thread id comes from `codex exec --json`.
+// The Codex CLI on this Mac (0.154) rejects the gpt-6 models with a ChatGPT login, so images run on CODEX_IMAGE_MODEL
+// (default gpt-5.6-sol, which was checked on 2026-10-18). Change it in .env.local after updating Codex.
+const IMAGE_MODEL = () => process.env.CODEX_IMAGE_MODEL || "gpt-5.6-sol";
 
 type Opts = { run?: (prompt: string) => Promise<string>; codexHome?: string };
 
@@ -15,7 +18,8 @@ function execCodex(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const cwd = path.join(paths.data, "agent-scratch");
     fs.mkdirSync(cwd, { recursive: true });
-    const child = execFile(paths.codexBin, ["exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only", "-"], { cwd, timeout: 300_000, maxBuffer: 20 * 1024 * 1024 }, (err, out, errOut) => {
+    const child = execFile(paths.codexBin, ["exec", "-m", IMAGE_MODEL(), "--json", "--skip-git-repo-check", "--sandbox", "read-only", "-"], { cwd, timeout: 300_000, maxBuffer: 20 * 1024 * 1024 }, (err, out, errOut) => {
+      if (err && /"type":"turn\.failed"/.test(String(out))) return resolve(String(out));
       if (err) return reject(new Error(/usage limit|rate limit/i.test(String(errOut) + String(out)) ? "Your ChatGPT plan's image limit was reached. Try later or use Higgsfield." : `Codex couldn't make the image (${(String(errOut) || err.message).trim().split("\n").slice(-1)[0]}).`));
       resolve(String(out));
     });
@@ -36,6 +40,8 @@ export async function generateWithCodex(prompt: string, size: Size, opts: Opts =
   if (!prompt.trim()) throw new Error("Describe the image first.");
   const started = Date.now();
   const out = await (opts.run ?? execCodex)(codexPrompt(prompt.slice(0, 2000), size));
+  const failed = /"type":"turn\.failed".*?"message":"((?:[^"\\]|\\.)*)"/.exec(out)?.[1];
+  if (failed) throw new Error(/not supported/.test(failed) ? `Codex rejected the image model ${IMAGE_MODEL()}. Set CODEX_IMAGE_MODEL in .env.local.` : /limit/i.test(failed) ? "Your ChatGPT plan's image limit was reached. Try later or use Higgsfield." : "Codex couldn't make the image. Try again or use Higgsfield.");
   const thread = /"thread_id"\s*:\s*"([0-9a-f-]{36})"/i.exec(out)?.[1];
   const home = opts.codexHome ?? process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex");
   const dir = thread ? path.join(home, "generated_images", thread) : null;

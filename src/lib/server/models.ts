@@ -135,11 +135,11 @@ export async function sendToBridge(id: string, prompt: string, model?: string) {
   return def.send(prompt, model);
 }
 
-// Claude desk for jobs that need specific tools (web search for news, reading uploaded images for Clone).
-// Only the named tools are available; everything else stays off.
+// Claude desk for carousel copy. Only the named tools are available (web search for news, reading uploads for Clone).
 export function claudeSend(prompt: string, opts: { tools?: string[]; dirs?: string[] } = {}) {
   if (!fs.existsSync(paths.claudeBin)) return Promise.reject(new Error(`Claude Code not found at ${paths.claudeBin}`));
-  const args = ["-p", "--output-format", "text"];
+  // Lean run: no MCP servers, skills, plugins or settings files, so each call carries only this prompt (about 3k tokens of setup).
+  const args = ["-p", "--output-format", "text", "--strict-mcp-config", "--disable-slash-commands", "--setting-sources", ""];
   args.push("--tools", opts.tools?.length ? opts.tools.join(",") : "");
   if (opts.tools?.length) args.push("--allowedTools", ...opts.tools);
   if (opts.dirs?.length) args.push("--add-dir", ...opts.dirs);
