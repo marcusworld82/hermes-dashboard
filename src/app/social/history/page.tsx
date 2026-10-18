@@ -28,7 +28,7 @@ export default function HistoryPage() {
             return (
               <Card key={c.id} className="overflow-hidden">
                 <button className="block w-full" onClick={() => router.push(`/social/carousels?id=${c.id}`)}>
-                  {c.slides.length ? <img src={`/api/social/carousels/${c.id}/slides/0`} alt="" loading="lazy" className="w-full aspect-[3/4] object-cover bg-[#f4f5f7]" /> : <div className="w-full aspect-[3/4] bg-[#f4f5f7] flex items-center justify-center text-xs text-[#9ca3af]">No slides yet</div>}
+                  {c.slides.length ? <img src={`/api/social/carousels/${c.id}/slides/0`} alt="" decoding="async" className="w-full aspect-[3/4] object-cover bg-[#f4f5f7]" /> : <div className="w-full aspect-[3/4] bg-[#f4f5f7] flex items-center justify-center text-xs text-[#9ca3af]">No slides yet</div>}
                 </button>
                 <div className="p-3">
                   <p className="font-medium text-sm truncate">{c.title || "Untitled carousel"}</p>
