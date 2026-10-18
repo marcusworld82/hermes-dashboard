@@ -68,7 +68,10 @@ export async function connections() {
   checks.push({ id: "crm", name: "CRM (Studio)", group: "Business apps", ok: crmUp, detail: crmUp ? `Running at ${paths.crmUrl}` : `Not running at ${paths.crmUrl}`, todo: crmUp ? undefined : 'Start it: cd "~/Desktop/Content and Outreach App/app" && npm run dev' });
   const crmDb = fs.existsSync(`${paths.crmDir}/data/studio.db`);
   checks.push({ id: "social", name: "Social workspace data", group: "Business apps", ok: crmDb, detail: crmDb ? "Reading the CRM's social drafts and schedule" : "CRM database not found" });
-  checks.push({ id: "postiz", name: "Postiz (publishing)", group: "Business apps", ok: crmDb, detail: "Connected inside the CRM. The dashboard only reads its schedule." });
+  const postiz = !!process.env.POSTIZ_API_KEY;
+  checks.push({ id: "postiz", name: "Postiz (publishing)", group: "Business apps", ok: postiz, detail: postiz ? "Key set. Hermes posts and schedules carousels through Postiz." : "Not connected", todo: postiz ? undefined : "Add POSTIZ_API_KEY to .env.local, then restart Hermes" });
+  const hf = !!(process.env.HF_API_KEY_ID && process.env.HF_API_KEY_SECRET);
+  checks.push({ id: "higgsfield", name: "Higgsfield (paid images)", group: "Business apps", ok: hf, detail: hf ? "Key set. Prices show before every image." : "Not connected", todo: hf ? undefined : "Add HF_API_KEY_ID and HF_API_KEY_SECRET to .env.local, then restart Hermes" });
 
   const vault = vaultReady();
   checks.push({ id: "obsidian", name: "Obsidian vault", group: "Memory", ok: vault, detail: vault ? `${paths.vault} (shipped projects go to ${paths.vaultPipelineFolder})` : "Vault not found" });

@@ -22,16 +22,16 @@ export function proxy(req: NextRequest) {
     if (!originHost || originHost !== host) {
       return new NextResponse("Changes must come from the dashboard itself.", { status: 403 });
     }
-    // JSON routes only accept JSON, so a plain cross-site form cannot reach them. Skill uploads are the one form route.
+    // JSON routes only accept JSON, so a plain cross-site form cannot reach them. Skill, social media and reference uploads are the form routes.
     const type = req.headers.get("content-type") ?? "";
-    const isUpload = req.nextUrl.pathname === "/api/skills" && req.method === "POST";
+    const isUpload = ["/api/skills", "/api/social/media", "/api/social/reference"].includes(req.nextUrl.pathname) && req.method === "POST";
     const hasBody = req.method !== "DELETE";
     const sendsBody = !!type || Number(req.headers.get("content-length") ?? 0) > 0;
     if (hasBody && !isUpload && sendsBody && !type.startsWith("application/json")) {
       return new NextResponse("Send JSON.", { status: 415 });
     }
     if (isUpload && !type.startsWith("multipart/form-data")) {
-      return new NextResponse("Upload a skill folder.", { status: 415 });
+      return new NextResponse("Send a file upload.", { status: 415 });
     }
   }
   return NextResponse.next();
