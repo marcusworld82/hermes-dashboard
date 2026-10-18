@@ -91,16 +91,18 @@ const defs: Def[] = [
     id: "muse",
     name: "Muse",
     provider: "Meta",
-    via: "Meta Model API (OpenAI-compatible, US preview)",
+    via: "Meta Model API (OpenAI-compatible, pay as you go)",
+    // Only the key is needed. The URL and model default to Meta's documented values; the
+    // contributor model is about 10 times cheaper, and Meta may train on those chats.
     check: () =>
-      process.env.MUSE_API_KEY && process.env.MUSE_BASE_URL && process.env.MUSE_MODEL
-        ? { ready: true, note: "Key, URL and model set." }
-        : { ready: false, note: "Add MUSE_API_KEY, MUSE_BASE_URL and MUSE_MODEL from Meta's developer portal." },
+      process.env.MUSE_API_KEY
+        ? { ready: true, note: `Using ${process.env.MUSE_MODEL || "muse-spark-1.3"}.` }
+        : { ready: false, note: "Add MUSE_API_KEY (starts with LLM_) from dev.meta.ai, API keys tab." },
     send: (prompt) =>
       openAiCompatible(
-        `${process.env.MUSE_BASE_URL!.replace(/\/$/, "")}/chat/completions`,
+        `${(process.env.MUSE_BASE_URL || "https://api.meta.ai/v1").replace(/\/$/, "")}/chat/completions`,
         process.env.MUSE_API_KEY!,
-        process.env.MUSE_MODEL!,
+        process.env.MUSE_MODEL || "muse-spark-1.3",
         prompt,
       ),
   },
