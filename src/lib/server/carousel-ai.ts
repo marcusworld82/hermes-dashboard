@@ -66,7 +66,8 @@ function prompt(step: Step, car: Carousel, opts: { index?: number }, d: Deps): s
     case "ideas":
       return `${base}\n\nSuggest 6 punchy carousel topics for this brand's audience.${car.inputs.steer ? ` Steer: ${car.inputs.steer}.` : ""} Each under 60 characters, lowercase is fine.\nReply with JSON only: {"ideas": ["..."]}`;
     case "news":
-      return `${base}\n\nSearch the web for 3 news stories from the last 14 days that this brand's audience would care about (AI, automation, money, creators). Only include stories you found with a real URL.\nReply with JSON only: {"news": [{"title": "...", "url": "https://...", "summary": "one sentence"}]}`;
+      // No brand notes or reference text here: this step can search the web, so it only gets the topic.
+      return `Brand audience: creators and small business owners interested in AI, automation and money.${car.inputs.topic ? ` Topic: ${car.inputs.topic}.` : ""}\n\nSearch the web for 3 news stories from the last 14 days that this brand's audience would care about (AI, automation, money, creators). Only include stories you found with a real URL.\nReply with JSON only: {"news": [{"title": "...", "url": "https://...", "summary": "one sentence"}]}`;
     case "hooks":
       return `${base}\n\nWrite 5 cover hooks for this carousel. Each must use one of these formulas: ${HOOK_FORMULAS.join(" | ")}. Under 70 characters each.\nReply with JSON only: {"hooks": [{"text": "...", "formula": "one of the formulas exactly"}]}`;
     case "slides":
@@ -146,7 +147,7 @@ function copyText(r: Result): string {
 
 export async function generate(step: Step, car: Carousel, opts: { index?: number }, d: Deps): Promise<Result> {
   d.requireRuns();
-  const tools = step === "news" ? ["WebSearch", "WebFetch"] : step === "clone" ? ["Read"] : undefined;
+  const tools = step === "news" ? ["WebSearch"] : step === "clone" ? ["Read"] : undefined;
   const dirs = step === "clone" && d.mediaDir ? [d.mediaDir] : undefined;
   let result = shape(step, parseJsonReply(await d.send(prompt(step, car, opts, d), { tools, dirs })), car, opts, d);
   let found = findBanned(copyText(result), d.banned);

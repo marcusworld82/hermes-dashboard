@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import dns from "node:dns/promises";
+import net from "node:net";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,12 +12,44 @@ const strip = (html: string) =>
     .replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/\s+/g, " ").trim();
 
-export async function fetchReference(url: string, fetcher: typeof fetch = fetch): Promise<string> {
+// Blocks loopback, private, link-local, CGNAT, unique-local and IPv4-mapped private addresses.
+export function isPrivateIp(ip: string): boolean {
+  let v = ip.toLowerCase();
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
+  if (mapped) v = mapped[1];
+  if (net.isIPv4(v)) {
+    const [a, b] = v.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  }
+  if (net.isIPv6(v)) return v === "::" || v === "::1" || /^f[cd]/.test(v) || /^fe[89ab]/.test(v) || v.startsWith("::ffff:");
+  return true;
+}
+
+async function checkHost(u: URL, lookup: typeof dns.lookup) {
+  if (u.protocol !== "https:") throw new Error("Use an https link.");
+  if (u.username || u.password) throw new Error("Links with passwords aren't allowed.");
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  const addrs = net.isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => { throw new Error("That site couldn't be found."); });
+  if (!addrs.length || addrs.some((a) => isPrivateIp(a.address))) throw new Error("That link points at a private address.");
+}
+
+// Follows up to 3 redirects by hand so every hop is checked against private addresses.
+export async function fetchReference(url: string, fetcher: typeof fetch = fetch, lookup: typeof dns.lookup = dns.lookup): Promise<string> {
   let u: URL;
   try { u = new URL(url); } catch { throw new Error("That link isn't valid."); }
-  if (u.protocol !== "https:") throw new Error("Use an https link.");
-  if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.|\[?::1)/.test(u.hostname)) throw new Error("That link points at a private address.");
-  const res = await fetcher(u, { redirect: "follow", signal: AbortSignal.timeout(10_000), headers: { "user-agent": "Mozilla/5.0 Hermes reference reader" } });
+  let res: Response | null = null;
+  for (let hop = 0; hop < 4; hop++) {
+    await checkHost(u, lookup);
+    res = await fetcher(u, { redirect: "manual", signal: AbortSignal.timeout(10_000), headers: { "user-agent": "Mozilla/5.0 Hermes reference reader" } });
+    if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
+      await res.body?.cancel();
+      u = new URL(res.headers.get("location")!, u);
+      res = null;
+      continue;
+    }
+    break;
+  }
+  if (!res) throw new Error("That link redirects too many times.");
   if (!res.ok) throw new Error(`The page answered ${res.status}.`);
   const reader = res.body?.getReader();
   if (!reader) throw new Error("The page was empty.");

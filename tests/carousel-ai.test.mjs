@@ -43,3 +43,11 @@ test('turned-off agent runs stop generation before any model call', async () => 
 test('broken JSON leaves a plain error and no partial result', async () => {
   await assert.rejects(() => generate('ideas', car, {}, deps(['I could not do that'])), /couldn't be read/);
 });
+
+test('the news step sends no brand notes or reference text and only allows web search', async () => {
+  const calls = []; let seen;
+  const d = { ...deps([JSON.stringify({ news: [] })], calls), foundation: 'SECRET-FOUNDATION', send: async (p, o) => { calls.push(p); seen = o; return JSON.stringify({ news: [] }); } };
+  await generate('news', { ...car, inputs: { ...car.inputs, referenceText: 'SECRET-REF' } }, {}, d);
+  assert.ok(!calls[0].includes('SECRET-FOUNDATION') && !calls[0].includes('SECRET-REF'));
+  assert.deepEqual(seen.tools, ['WebSearch']);
+});
