@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Hermes Command Center",
-    short_name: "Hermes",
-    description: "Marcus's command center for Hermes agents",
+    name: "Marcus OS",
+    short_name: "Marcus OS",
+    description: "Marcus's command center for agents, content and outreach",
     start_url: "/dashboard",
     display: "standalone",
     orientation: "portrait",

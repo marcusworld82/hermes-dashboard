@@ -1,14 +1,15 @@
-import { readJson, writeJson } from "./store";
-import { readTeam } from "./agents";
+import { readJson, writeJson } from "./store.ts";
+import { readTeam } from "./agents.ts";
 
 export type Settings = {
   // Off by default. While off, nothing is sent to a model and no agent is started,
   // so building and testing the dashboard never spends money.
   agentRuns: boolean;
   headAgent: string;
+  obsidianAutoSave: boolean;
 };
 
-const defaults: Settings = { agentRuns: false, headAgent: "jordan" };
+const defaults: Settings = { agentRuns: false, headAgent: "jordan", obsidianAutoSave: false };
 
 export function getSettings(): Settings {
   const saved = { ...defaults, ...readJson<Partial<Settings>>("settings", {}) };

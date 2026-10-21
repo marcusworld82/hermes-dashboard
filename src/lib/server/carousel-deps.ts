@@ -12,5 +12,5 @@ const NOTES = ["AI Brain/2026-10-16-marcus-personal-brand-foundation.md", "AI Br
 
 export function carouselDeps(brandId: string): Deps {
   const foundation = NOTES.map((n) => { try { return fs.readFileSync(path.join(paths.vault, n), "utf8"); } catch { return ""; } }).filter(Boolean).join("\n\n---\n\n");
-  return { send: claudeSend, requireRuns, brand: getBrandKit(brandId), banned: getBanned(), foundation, mediaDir: path.join(paths.data, "social-media") };
+  return { send: (prompt, opts) => claudeSend(prompt, { ...opts, agentId: "maya" }), requireRuns, brand: getBrandKit(brandId), banned: getBanned(), foundation, mediaDir: path.join(paths.data, "social-media") };
 }

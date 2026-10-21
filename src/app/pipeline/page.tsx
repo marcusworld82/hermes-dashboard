@@ -109,7 +109,7 @@ function PipelineInner() {
       </div>
 
       <RunsOffNote on={cfg?.settings.agentRuns} />
-      <ErrorNote text={error || msg || (data?.offline ? `Hermes is not answering: ${data.offline}` : null)} />
+      <ErrorNote text={error || msg || (data?.offline ? `Marcus OS is not answering: ${data.offline}` : null)} />
 
       <Card className="p-2 mb-5">
         <div className="flex items-end gap-2">
@@ -264,7 +264,7 @@ function Detail({ item, agents, onClose, act, busy }: { item: Item | null; agent
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Badge tone="purple">{item.kind}</Badge>
         <Badge>{STAGES.find((s) => s.id === item.stage)?.label}</Badge>
-        <span className="text-xs text-[#9ca3af]">Hermes card {item.id}</span>
+        <span className="text-xs text-[#9ca3af]">Marcus OS card {item.id}</span>
       </div>
       <p className="text-xs font-medium text-[#6b7280] mb-1">The idea</p>
       <p className="text-sm leading-relaxed whitespace-pre-wrap mb-5">{item.idea}</p>

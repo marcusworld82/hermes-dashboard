@@ -26,7 +26,8 @@ const one = [{ id: "default", name: "Default" }];
 const creative = (id: string, name: string, style: CreativeStyle): TemplateDef => ({ id, mode: "creative", name, layouts: one, style });
 
 export const TEMPLATES: TemplateDef[] = [
-  { id: "screenshot", mode: "screenshot", name: "Screenshot", layouts: one },
+  { id: "screenshot", mode: "screenshot", name: "Text only", layouts: one },
+  { id: "screenshot-image", mode: "screenshot", name: "Text + image", layouts: one },
   creative("moola", "Moola", { bg: "#1C1C1C", text: "#FFFFFF", accent: "#FFFFFF", display: "anton", body: "inter", textCase: "upper", align: "left", headlineMax: 150, image: "none", deco: [] }),
   creative("bookworm", "Bookworm", { bg: "#15130F", text: "#E8B21C", accent: "#E8B21C", display: "anton", body: "inter", textCase: "upper", align: "center", headlineMax: 130, image: "below", deco: ["counter", "grain"] }),
   creative("brock", "Brock", { bg: "#FFFFFF", text: "#111111", accent: "#111111", display: "inter", body: "inter", textCase: "title", align: "center", headlineMax: 78, image: "below", deco: [] }),

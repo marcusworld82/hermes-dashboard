@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "companies": [
+    {"url":"https://www.notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "Name":"Fixture business", "Segment":"Ecommerce", "General Business Email":"hello@example.test", "Priority Score":0, "Confidence":"Low", "Tags":"[\"Shopify\"]", "Why Tags":["No video seen"], "Evidence":"[\"https://www.notion.so/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"]", "People":[{"id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}], "date:First Found:start":"2026-10-20", "Outreach Status":"Needs review", "Draft Email":"Fixture draft only", "Score Parts":"Service fit: 0", "Lead Origin":"Manual", "Website":"javascript:alert(1)"},
+    {"url":"https://www.notion.so/cccccccccccccccccccccccccccccccc", "Name":"Unknown score fixture", "Stage":"Do not contact"}
+  ],
+  "people":[{"url":"https://www.notion.so/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "Name":"Fixture person", "Current Title":"Owner", "Company":"[\"https://www.notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"]", "Role Evidence URL":"https://example.test/team"}],
+  "opportunities":[{"url":"https://www.notion.so/dddddddddddddddddddddddddddddddd", "Name":"Fixture signal", "Source Platform":"Reddit", "Source URL":"https://example.test/post", "date:Observed Date:start":"2026-10-20"}],
+  "evidence":[{"url":"https://www.notion.so/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "Title":"Fixture observation", "Observation":"A saved test observation.", "Source URL":"https://example.test", "date:Observed Date:start":"2026-10-20", "Companies":"[\"https://www.notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"]"}],
+  "runLog":[{"url":"https://www.notion.so/ffffffffffffffffffffffffffffffff", "Run Name":"Fixture run", "date:Started:start":"2026-10-20T12:00:00Z", "Cost USD":0.25}, {"url":"https://www.notion.so/11111111111111111111111111111111", "Run Name":"Unknown cost fixture", "date:Started:start":"2026-10-20T12:00:00Z"}]
+}

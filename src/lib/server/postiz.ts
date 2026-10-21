@@ -10,7 +10,7 @@ export class PostizError extends Error {
 }
 
 export type PostizChannel = { id: string; name: string; identifier: string; disabled: boolean; profile: string };
-export type PostizMedia = { id: string; path: string };
+export type PostizMedia = { id: string; path: string; thumbnail?: string };
 export type ProviderPost = { id: string; state: string; publishDate: string; releaseURL?: string; integration: { id: string }; content?: string };
 
 const idOk = (s: string) => /^[a-zA-Z0-9_-]{1,128}$/.test(s);
@@ -52,14 +52,71 @@ function html(t: string) {
   return t.split(/\n\s*\n/).map((p) => "<p>" + p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>") + "</p>").join("");
 }
 
-export function postingPayload(channel: PostizChannel, utc: string, caption: string, media: PostizMedia[], aiGenerated: boolean, sponsored: boolean, now = false) {
+// Every Postiz option Marcus OS exposes, per network. Defaults match what Marcus OS sent before these options existed.
+export type PostOptions = {
+  draft: boolean;
+  comments: string[];
+  instagram: { postType: "post" | "story"; trialReel: boolean; graduation: "MANUAL" | "SS_PERFORMANCE"; collaborators: string[] };
+  tiktok: { title: string; privacy: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY"; duet: boolean; stitch: boolean; comment: boolean; autoAddMusic: boolean; method: "DIRECT_POST" | "UPLOAD" };
+  linkedin: { carousel: boolean | null };
+  x: { whoCanReply: "everyone" | "following" | "mentionedUsers" | "subscribers" | "verified"; community: string };
+  facebook: { postType: "post" | "story" };
+};
+export const DEFAULT_POST_OPTIONS: PostOptions = {
+  draft: false, comments: [],
+  instagram: { postType: "post", trialReel: false, graduation: "MANUAL", collaborators: [] },
+  tiktok: { title: "", privacy: "PUBLIC_TO_EVERYONE", duet: false, stitch: false, comment: true, autoAddMusic: false, method: "DIRECT_POST" },
+  linkedin: { carousel: null },
+  x: { whoCanReply: "everyone", community: "" },
+  facebook: { postType: "post" },
+};
+const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed as readonly unknown[]).includes(v) ? (v as T) : fallback;
+const bool = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
+
+// Accepts options from the browser. Anything unknown falls back to the safe default.
+export function cleanPostOptions(raw: unknown): PostOptions {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, Record<string, unknown> | unknown>;
+  const o = (k: string) => (r[k] && typeof r[k] === "object" ? r[k] : {}) as Record<string, unknown>;
+  const d = DEFAULT_POST_OPTIONS;
+  const comments = (Array.isArray(r.comments) ? r.comments : []).map((c) => String(c ?? "").trim()).filter(Boolean);
+  if (comments.length > 2 || comments.some((c) => c.length > 2200 || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(c))) throw new PostizError("Use up to two comments, 2,200 characters each.");
+  const ig = o("instagram"), tt = o("tiktok"), x = o("x");
+  const collaborators = (Array.isArray(ig.collaborators) ? ig.collaborators : []).map((c) => String(c).trim().replace(/^@/, "")).filter(Boolean);
+  if (collaborators.length > 3 || collaborators.some((c) => !/^[A-Za-z0-9._]{1,30}$/.test(c))) throw new PostizError("Add up to 3 Instagram collaborators by username.");
+  const title = String(tt.title ?? "");
+  if (title.length > 90) throw new PostizError("TikTok titles are 90 characters or fewer.");
+  const community = String(x.community ?? "").trim();
+  if (community && !/^https:\/\/x\.com\/i\/communities\/\d+$/.test(community)) throw new PostizError("X community must look like https://x.com/i/communities/123.");
+  const li = o("linkedin");
+  return {
+    draft: bool(r.draft, false), comments,
+    instagram: { postType: pick(ig.postType, ["post", "story"], d.instagram.postType), trialReel: bool(ig.trialReel, false), graduation: pick(ig.graduation, ["MANUAL", "SS_PERFORMANCE"], "MANUAL"), collaborators },
+    tiktok: { title, privacy: pick(tt.privacy, ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"], d.tiktok.privacy), duet: bool(tt.duet, false), stitch: bool(tt.stitch, false), comment: bool(tt.comment, true), autoAddMusic: bool(tt.autoAddMusic, false), method: pick(tt.method, ["DIRECT_POST", "UPLOAD"], "DIRECT_POST") },
+    linkedin: { carousel: typeof li.carousel === "boolean" ? li.carousel : null },
+    x: { whoCanReply: pick(x.whoCanReply, ["everyone", "following", "mentionedUsers", "subscribers", "verified"], "everyone"), community },
+    facebook: { postType: pick(o("facebook").postType, ["post", "story"], "post") },
+  };
+}
+
+// Trial reels only exist for a single Instagram video posted to the feed.
+export function assertOptionsFit(opts: PostOptions, hasVideo: boolean) {
+  if (opts.instagram.trialReel && (!hasVideo || opts.instagram.postType !== "post")) throw new PostizError("Trial reels need one video posted as a feed post, not images or a story.");
+}
+
+export function postingPayload(channel: PostizChannel, utc: string, caption: string, media: PostizMedia[], aiGenerated: boolean, sponsored: boolean, now = false, opts: PostOptions = DEFAULT_POST_OPTIONS) {
   const network = channel.identifier;
   const settings: Record<string, unknown> = { __type: network };
-  if (/^instagram/.test(network)) Object.assign(settings, { post_type: "post", is_trial_reel: false, collaborators: [] });
-  if (/^linkedin/.test(network)) settings.post_as_images_carousel = media.length > 1;
-  if (/^tiktok/.test(network)) Object.assign(settings, { title: "", privacy_level: "PUBLIC_TO_EVERYONE", duet: false, stitch: false, comment: true, autoAddMusic: "no", brand_content_toggle: sponsored, brand_organic_toggle: false, video_made_with_ai: aiGenerated, content_posting_method: "DIRECT_POST" });
+  if (/^instagram/.test(network)) Object.assign(settings, { post_type: opts.instagram.postType, is_trial_reel: opts.instagram.trialReel, ...(opts.instagram.trialReel ? { graduation_strategy: opts.instagram.graduation } : {}), collaborators: opts.instagram.collaborators.map((label) => ({ label })) });
+  if (/^linkedin/.test(network)) settings.post_as_images_carousel = opts.linkedin.carousel ?? media.length > 1;
+  if (/^tiktok/.test(network)) Object.assign(settings, { title: opts.tiktok.title, privacy_level: opts.tiktok.privacy, duet: opts.tiktok.duet, stitch: opts.tiktok.stitch, comment: opts.tiktok.comment, autoAddMusic: opts.tiktok.autoAddMusic ? "yes" : "no", brand_content_toggle: sponsored, brand_organic_toggle: false, video_made_with_ai: aiGenerated, content_posting_method: opts.tiktok.method });
+  if (network === "x") Object.assign(settings, { who_can_reply_post: opts.x.whoCanReply, ...(opts.x.community ? { community: opts.x.community } : {}), made_with_ai: aiGenerated });
+  if (network === "facebook") settings.post_type = opts.facebook.postType;
   const parts = network === "threads" ? splitThread(caption, 500) : [caption];
-  return { type: now ? "now" : "schedule", date: utc, shortLink: false, tags: [], posts: [{ integration: { id: channel.id }, value: parts.map((p, i) => ({ content: html(p), image: i === 0 ? media : [] })), settings }] };
+  // Extra parts become comments or thread replies. TikTok and YouTube do not support them, and stories have no comments.
+  const story = (/^instagram/.test(network) && opts.instagram.postType === "story") || (network === "facebook" && opts.facebook.postType === "story");
+  const comments = /^(tiktok|youtube)/.test(network) || story ? [] : opts.comments.flatMap((c) => (network === "threads" ? splitThread(c, 500) : [c]));
+  const value = [...parts, ...comments].map((p, i) => ({ content: html(p), image: i === 0 ? media : [] }));
+  return { type: opts.draft ? "draft" : now ? "now" : "schedule", date: utc, shortLink: false, tags: [], posts: [{ integration: { id: channel.id }, value, settings }] };
 }
 export type PostingPayload = ReturnType<typeof postingPayload>;
 
@@ -129,6 +186,6 @@ export class PostizClient {
 export function postizReady() { return !!process.env.POSTIZ_API_KEY; }
 export function postizClient() {
   const key = process.env.POSTIZ_API_KEY;
-  if (!key) throw new PostizError("Add POSTIZ_API_KEY to .env.local, then restart Hermes.");
+  if (!key) throw new PostizError("Add POSTIZ_API_KEY to .env.local, then restart Marcus OS.");
   return new PostizClient(key);
 }

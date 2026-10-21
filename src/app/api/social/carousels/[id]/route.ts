@@ -3,7 +3,7 @@ import { getCarousel, updateCarousel, deleteCarousel, createCarousel } from "@/l
 import type { Carousel } from "@/lib/carousel/types";
 
 type Ctx = { params: Promise<{ id: string }> };
-const EDITABLE = ["mode", "template", "size", "theme", "useBrandColors", "title", "inputs", "hook", "hooks", "ideas", "news", "slides", "caption", "clone", "flags"] as const;
+const EDITABLE = ["mode", "template", "size", "theme", "useBrandColors", "title", "inputs", "hook", "hooks", "ideas", "news", "slides", "caption", "clone", "cover", "flags"] as const;
 
 export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;

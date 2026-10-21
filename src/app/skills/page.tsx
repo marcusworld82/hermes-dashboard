@@ -43,7 +43,7 @@ export default function SkillsPage() {
         }
       />
       <ErrorNote text={error || msg || data?.error || null} />
-      {missing > 0 && <p className="text-sm bg-[#fef3c7] text-[#92400e] rounded-2xl px-3 py-2.5 mb-4">{missing} skills listed in your agent package are not installed in Hermes yet.</p>}
+      {missing > 0 && <p className="text-sm bg-[#fef3c7] text-[#92400e] rounded-2xl px-3 py-2.5 mb-4">{missing} skills listed in your agent package are not installed in Marcus OS yet.</p>}
 
       {(data?.pending.length ?? 0) > 0 && (
         <Card className="p-4 mb-4">
@@ -111,7 +111,7 @@ function Assign({ skill, agents, onDone }: { skill: Skill; agents: Agent[]; onDo
   return (
     <div>
       <p className="text-sm text-[#6b7280] mb-3">
-        Pick who should have this skill. Saving copies it into each chosen agent in Hermes and removes it from the others. Your library copy always stays.
+        Pick who should have this skill. Saving copies it into each chosen agent in Marcus OS and removes it from the others. Your library copy always stays.
       </p>
       <div className="grid grid-cols-2 gap-2 mb-4">
         {agents.map((a) => {

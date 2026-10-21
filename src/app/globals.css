@@ -1,24 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f7f6f4;
-  --surface: #ffffff;
-  --surface-soft: #fcfcfd;
-  --border: #e8eaee;
-  --text: #1a1d24;
-  --text-muted: #6b7280;
-  --text-soft: #9ca3af;
-  --accent: #1a1d24;
-  --accent-soft: #f0f1f3;
-  --green: #10b981;
-  --green-soft: #d1fae5;
-  --red: #ef4444;
-  --red-soft: #fee2e2;
-  --blue: #3b82f6;
-  --blue-soft: #dbeafe;
-  --purple: #8b5cf6;
-  --purple-soft: #ede9fe;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.04);
+  color-scheme: light;
+  --bg: #faf7f2;
+  --surface: #fffefd;
+  --surface-soft: #f5efea;
+  --border: #e8ded8;
+  --text: #201b19;
+  --text-muted: #6e625c;
+  --text-soft: #796b64;
+  --accent: #e81725;
+  --accent-soft: #fde8e7;
+  --green: #176b4c;
+  --green-soft: #e7f4ec;
+  --red: #b91c2b;
+  --red-soft: #fce7e7;
+  --blue: #2358a5;
+  --blue-soft: #eaf1fb;
+  --purple: #805169;
+  --purple-soft: #f5eaf0;
+  --shadow: 0 8px 30px rgba(80, 44, 30, .06);
   --radius: 20px;
   --radius-sm: 14px;
   --radius-pill: 999px;
@@ -38,13 +39,8 @@ html, body {
 
 body {
   min-height: 100vh;
-  background: #f7f6f4;
-  background-image:
-    radial-gradient(ellipse 80% 60% at 15% 10%, rgba(255, 255, 255, 0.95) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 50% at 85% 20%, rgba(255, 248, 240, 0.55) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 70% at 50% 90%, rgba(240, 244, 250, 0.6) 0%, transparent 55%),
-    radial-gradient(ellipse 40% 40% at 70% 60%, rgba(255, 255, 255, 0.4) 0%, transparent 40%),
-    linear-gradient(180deg, #faf9f7 0%, #f4f3f1 50%, #f6f5f3 100%);
+  background: var(--bg);
+  background-image: radial-gradient(ellipse at 0% 0%, #f8d9d566, transparent 45%), radial-gradient(ellipse at 100% 75%, #fbe5df55, transparent 40%);
   background-attachment: fixed;
 }
 
@@ -141,4 +137,83 @@ html {
   .screen-h {
     height: 100dvh;
   }
+}
+
+/* Map existing dashboard utility colors to the reference cream palette. */
+.text-\[\#6b7280\] { color: var(--text-muted); }
+.text-\[\#9ca3af\] { color: var(--text-soft); }
+.text-\[\#1a1d24\] { color: var(--text); }
+.text-\[\#374151\] { color: var(--text); }
+.text-\[\#92400e\] { color: #8b570f; }
+.text-\[\#b45309\] { color: #8b570f; }
+.text-\[\#b91c1c\] { color: var(--red); }
+.text-\[\#991b1b\] { color: var(--red); }
+.text-\[\#047857\] { color: var(--green); }
+.text-\[\#166534\] { color: var(--green); }
+.text-\[\#065f46\] { color: var(--green); }
+.text-\[\#6d28d9\] { color: var(--purple); }
+.text-\[\#1d4ed8\] { color: var(--blue); }
+.bg-\[\#1a1d24\] { background-color: var(--accent); }
+.bg-\[\#f4f5f7\] { background-color: var(--surface-soft); }
+.bg-\[\#fafbfc\] { background-color: var(--surface-soft); }
+.bg-\[\#f0f1f3\] { background-color: var(--surface-soft); }
+.bg-\[\#e8eaee\] { background-color: var(--border); }
+.bg-\[\#d1d5db\] { background-color: var(--border); }
+.bg-\[\#fef3c7\] { background-color: #fff3d9; }
+.bg-\[\#fffbeb\] { background-color: #fff3d9; }
+.bg-\[\#fee2e2\] { background-color: var(--red-soft); }
+.bg-\[\#fecaca\] { background-color: var(--red-soft); }
+.bg-\[\#d1fae5\] { background-color: var(--green-soft); }
+.bg-\[\#f0fdf4\] { background-color: var(--green-soft); }
+.bg-\[\#dbeafe\] { background-color: var(--blue-soft); }
+.bg-\[\#f0f7ff\] { background-color: var(--blue-soft); }
+.bg-\[\#ede9fe\] { background-color: var(--purple-soft); }
+.border-\[\#e8eaee\] { border-color: var(--border); }
+.border-\[\#e8eaee\]\/30 { border-color: var(--border); }
+.border-\[\#e8eaee\]\/60 { border-color: var(--border); }
+.border-\[\#e8eaee\]\/70 { border-color: var(--border); }
+.border-\[\#e8eaee\]\/80 { border-color: var(--border); }
+.border-\[\#f0f1f3\] { border-color: var(--border); }
+.border-\[\#f0f1f3\]\/30 { border-color: var(--border); }
+.border-\[\#f0f1f3\]\/60 { border-color: var(--border); }
+.border-\[\#f0f1f3\]\/70 { border-color: var(--border); }
+.border-\[\#f0f1f3\]\/80 { border-color: var(--border); }
+.border-\[\#d1d5db\] { border-color: var(--border); }
+.border-\[\#d1d5db\]\/30 { border-color: var(--border); }
+.border-\[\#d1d5db\]\/60 { border-color: var(--border); }
+.border-\[\#d1d5db\]\/70 { border-color: var(--border); }
+.border-\[\#d1d5db\]\/80 { border-color: var(--border); }
+.border-\[\#1a1d24\] { border-color: var(--accent); }
+.border-\[\#1a1d24\]\/30 { border-color: var(--accent); }
+.border-\[\#1a1d24\]\/60 { border-color: var(--accent); }
+.border-\[\#1a1d24\]\/70 { border-color: var(--accent); }
+.border-\[\#1a1d24\]\/80 { border-color: var(--accent); }
+.border-\[\#f0f2f5\] { border-color: var(--border); }
+.border-\[\#f0f2f5\]\/30 { border-color: var(--border); }
+.border-\[\#f0f2f5\]\/60 { border-color: var(--border); }
+.border-\[\#f0f2f5\]\/70 { border-color: var(--border); }
+.border-\[\#f0f2f5\]\/80 { border-color: var(--border); }
+.bg-white { background-color: var(--surface); }
+.bg-white\/60, .bg-white\/70, .bg-white\/80, .bg-white\/85, .bg-white\/90 { background-color: color-mix(in srgb, var(--surface) 92%, transparent); }
+.border-white\/70 { border-color: var(--border); }
+.hover\:bg-white:hover, .hover\:bg-white\/80:hover { background-color: var(--surface-soft); }
+.hover\:text-\[\#1a1d24\]:hover { color: var(--text); }
+.text-gray-500, .text-gray-600, .text-slate-500, .text-slate-600 { color: var(--text-muted); }
+.text-gray-700, .text-gray-800, .text-gray-900 { color: var(--text); }
+.text-amber-700, .text-amber-800 { color: #8b570f; }
+.text-red-600, .text-red-700, .text-red-800 { color: var(--red); }
+.text-green-700, .text-emerald-700 { color: var(--green); }
+.bg-gray-50, .bg-gray-100 { background-color: var(--surface-soft); }
+.bg-amber-50, .bg-amber-100, .bg-yellow-50 { background-color: #fff3d9; }
+.bg-red-50, .bg-red-100 { background-color: var(--red-soft); }
+.bg-green-50, .bg-emerald-50 { background-color: var(--green-soft); }
+.border-gray-200, .border-gray-300 { border-color: var(--border); }
+input, textarea, select { accent-color: var(--accent); }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+
+/* Keep secondary details legible on warm, light surfaces. */
+::selection { background: var(--accent-soft); color: var(--text); }
+input::placeholder, textarea::placeholder { color: var(--text-soft); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

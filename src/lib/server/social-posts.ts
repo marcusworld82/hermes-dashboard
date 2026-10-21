@@ -1,5 +1,5 @@
 import { readJson, updateJson, newId } from "./store.ts";
-import { postingPayload, validatePostMedia, PostizError, type PostizChannel, type PostizMedia } from "./postiz.ts";
+import { postingPayload, validatePostMedia, assertOptionsFit, PostizError, DEFAULT_POST_OPTIONS, type PostizChannel, type PostizMedia, type PostOptions } from "./postiz.ts";
 
 // Every post Hermes sends to Postiz. The record is saved before anything is uploaded,
 // so a timeout can never turn into a silent double post.
@@ -17,6 +17,8 @@ export type PostRecord = {
   error: string | null;
   overrideReason: string | null;
   createdAt: string;
+  // Saved as a Postiz draft instead of scheduled.
+  draft?: boolean;
 };
 
 type Client = {
@@ -25,7 +27,7 @@ type Client = {
   schedule(payload: ReturnType<typeof postingPayload>): Promise<string>;
 };
 
-export type ScheduleInput = { carouselId: string; channelIds: string[]; when: string; now: boolean; caption: string; slides: Buffer[]; aiGenerated?: boolean; overrideReason?: string | null };
+export type ScheduleInput = { carouselId: string; channelIds: string[]; when: string; now: boolean; caption: string; slides: Buffer[]; assets?: {bytes:Buffer;name:string;mime:string}[]; aiGenerated?: boolean; overrideReason?: string | null; options?: PostOptions };
 
 const FILE = "social-posts";
 export const listPostRecords = () => readJson<PostRecord[]>(FILE, []);
@@ -48,9 +50,12 @@ export async function schedulePost(input: ScheduleInput, client: Client): Promis
   if (!input.now && !Number.isFinite(Date.parse(input.when))) throw new PostizError("Pick a valid date and time.");
   if (!input.now && Date.parse(input.when) < Date.now() - 60_000) throw new PostizError("That time is in the past.");
   blockIfPending(input.carouselId);
+  const assets=input.assets??input.slides.map((bytes,i)=>({bytes,name:`slide-${i+1}.png`,mime:"image/png"}));
+  const options = input.options ?? DEFAULT_POST_OPTIONS;
+  assertOptionsFit(options, assets.some((a) => a.mime === "video/mp4"));
   const rec: PostRecord = {
     id: newId("post"), carouselId: input.carouselId, channelIds: input.channelIds, when: input.now ? new Date().toISOString() : input.when, now: input.now,
-    caption: input.caption, state: "submitting", postizIds: [], error: null, overrideReason: input.overrideReason ?? null, createdAt: new Date().toISOString(),
+    caption: input.caption, state: "submitting", postizIds: [], error: null, overrideReason: input.overrideReason ?? null, createdAt: new Date().toISOString(), ...(options.draft ? { draft: true } : {}),
   };
   save(rec);
   try {
@@ -58,13 +63,13 @@ export async function schedulePost(input: ScheduleInput, client: Client): Promis
     const picked = input.channelIds.map((cid) => {
       const c = channels.find((x) => x.id === cid);
       if (!c || c.disabled) throw new PostizError("One of the chosen accounts is missing or disabled in Postiz.");
-      validatePostMedia(c.identifier, input.slides.map(() => ({ mime: "image/png" })));
+      validatePostMedia(c.identifier, assets);
       return c;
     });
     const media: PostizMedia[] = [];
-    for (const [i, png] of input.slides.entries()) media.push(await client.upload(png, `slide-${i + 1}.png`, "image/png"));
+    for (const asset of assets) media.push(await client.upload(asset.bytes, asset.name, asset.mime));
     for (const c of picked) {
-      rec.postizIds.push(await client.schedule(postingPayload(c, rec.when, input.caption, media, !!input.aiGenerated, false, input.now)));
+      rec.postizIds.push(await client.schedule(postingPayload(c, rec.when, input.caption, media, !!input.aiGenerated, false, input.now, options)));
       save(rec);
     }
     rec.state = "scheduled";

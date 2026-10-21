@@ -30,6 +30,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         await hermes.unblockTask(id, board);
         break;
       }
+      case "assign": {
+        const { getAgents } = await import("@/lib/server/agents");
+        if (!b.profile || !(await getAgents()).some((a) => a.id === b.profile && a.installed)) throw new Error("Choose an installed agent.");
+        await hermes.assignTask(id, b.profile, board);
+        break;
+      }
+      case "complete":
+        if (!b.text?.trim()) throw new Error("Add a result before completing this card.");
+        await hermes.completeTask(id, b.text.trim(), board);
+        break;
       case "archive":
         await hermes.archiveTask(id, board);
         break;

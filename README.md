@@ -1,37 +1,57 @@
-# Hermes Dashboard
+# Marcus OS
 
-Marcus's command center for his Hermes agents. Runs on his Mac at http://127.0.0.1:3200, installable on the iPhone through Tailscale.
+Canonical source: [marcusworld82/hermes-dashboard](https://github.com/marcusworld82/hermes-dashboard), branch **main**.
 
-```bash
-npm install
+The repository keeps its original GitHub name. The application is named Marcus OS.
+
+## Source layout
+
+| Folder | Purpose |
+| --- | --- |
+| `src/`, `scripts/` | Mac app, local agents, integrations and workers |
+| `cloud/` | Vercel app, private login, cloud gateway and saved views |
+| `tests/` | Local app tests |
+| `deployment/persistent-host/` | Always-on host deployment preparation |
+| `docs/` | Integration and build documentation |
+
+Vercel project `hermes-dashboard` uses this repository, production branch `main`, root directory `cloud`.
+Production URL: https://hermes-dashboard-sandy.vercel.app
+
+The old sibling `../cloud` folder is a legacy local copy. Make future cloud changes in this repository's `cloud/` folder.
+
+## Run the Mac app
+
+Use Node.js 24 or newer with native TypeScript and SQLite support.
+
+```sh
+npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
-## What is in it
+Open http://localhost:3200. Configure local integration credentials privately. Existing installations should preserve their `.env.local` and local data.
 
-| Page | What it does |
-|---|---|
-| Home | "What are we creating today?" capture box, pipeline counts, agents, recent work |
-| Pipeline | Inbox to Shipped: Capture, Human Gate (approve or reject a plan), Execute, Shipped gallery. Shipped projects are logged to Obsidian. |
-| Kanban | Every card on the real Hermes boards, with comments, links and history |
-| Chat | Talk to one agent, a group, the head agent (Operator), or a model directly |
-| Agents | The eight agents from `~/Desktop/LAZY MONEY AGENTS`, org chart, who you talk to most, groups |
-| Workflows | Saved multi-step jobs with templates. A run creates linked Hermes cards. |
-| Skills | Installed Hermes skills, package skills not yet installed, upload, install, assign |
-| Connections | Live status of Hermes, model keys, bridges, MCP servers, CRM, Obsidian, phone |
-| Social | Calendar, drafts and captions read from the CRM |
-| CRM | The Studio CRM inside the dashboard. Desktop on this Mac only. |
-| Recast | Video breakdowns into captions and scripts (needs its own Google key). Desktop only, with a Start button. |
-| OpenAdKit | Open-source AI ad copy and creative tool (needs its own provider key). Desktop only, with a Start button. |
-| Settings | The agent runs switch and where everything lives |
+```sh
+npm run verify
+npm run build
+```
 
-## How it works
+## Run the cloud app
 
-- Hermes is the engine. The dashboard calls the `hermes` command line (no shell) for boards, cards, profiles, skills and MCP servers.
-- Pipeline cards live on their own Hermes board, `command-center`. Ideas are parked as blocked cards, never in Hermes's triage column, because Hermes auto-splits triage cards and starts agents on them, which would skip the approval gate.
-- Approving a plan creates one card per step, linked so each waits for the steps before it, plus a Quality Control check at the end.
-- Agent runs are off by default. While off, nothing is sent to a model and no agent starts.
-- Dashboard-only data (plans, chats, groups, workflows, settings) is in `data/`, which is not committed.
-- Requests that change something must come from the dashboard's own pages (`src/proxy.ts`).
+```sh
+cd cloud
+npm ci
+npm run dev
+```
 
-See `SETUP-CHECKLIST.md` for what is left to connect.
+Cloud deployment needs the existing server-only login, bridge and private Blob environment variables. See [CLOUD-HOSTING.md](CLOUD-HOSTING.md). Never commit environment files, tokens, live data or private screenshots.
+
+## Connections and limits
+
+The cloud UI relays live actions to the Mac. Saved views remain readable while the Mac is offline. Live agent runs and local tools require the Mac to be awake and connected.
+
+Composio MCP login is supported. A connected account does not by itself enable the background Gmail send queue. MCP queue transport remains unfinished; sending must remain disabled until that path is implemented and tested. See [Composio MCP notes](docs/composio-mcp.md).
+
+Private test contacts can be excluded using the server-only `MARCUS_TEST_CONTACT_EMAILS` setting, a comma-separated list in `.env.local`.
+
+Legacy `HERMES_*` environment names and launchd service identifiers remain for compatibility. They do not identify a separate app or repository.

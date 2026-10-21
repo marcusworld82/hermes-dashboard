@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hermes-tool-tests-'));
+process.env.HERMES_DATA_DIR=dir;
+const {queueToolJob,listToolJobs}=await import('../src/lib/server/tool-jobs.ts');
+const input={id:'job_00000000-0000-4000-8000-000000000001',tool:'recast',video_url:'https://youtube.com/watch?v=example',product_info:'Example product'};
+test('repeated request returns the same queued job',()=>{queueToolJob(input);queueToolJob(input);assert.equal(listToolJobs().length,1);assert.equal(listToolJobs()[0].state,'queued');});
+test('changed inputs cannot reuse a request id',()=>assert.throws(()=>queueToolJob({...input,product_info:'Changed'}),/new job/));
+test('private hosts and lookalike video domains are rejected',()=>{for(const url of ['http://127.0.0.1','https://youtube.com.attacker.test/watch','https://user:pass@youtube.com/watch'])assert.throws(()=>queueToolJob({...input,video_url:url}),/video link/);});
+test.after(()=>fs.rmSync(dir,{recursive:true,force:true}));

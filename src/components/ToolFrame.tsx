@@ -61,6 +61,7 @@ export function ToolFrame({ id, about, keyNote }: { id: string; about: string; k
       </div>
       {data?.running ? (
         <>
+          {data.configured == null && <p className="text-xs bg-[#fef3c7] text-[#92400e] px-4 py-2">The tool is running. Its provider connection has not been verified.</p>}
           {data.configured === false && <p className="text-xs bg-[#fef3c7] text-[#92400e] px-4 py-2">{keyNote}</p>}
           <iframe ref={frame} src={data.url} title={data.name} className="flex-1 w-full border-0 bg-white" />
         </>

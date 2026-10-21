@@ -1,0 +1,2 @@
+import {Card,Page,PageHeader} from '@/components/ui';
+export default function MotionLab(){return <Page><PageHeader title="Motion Lab" sub="Open your animation workspace."/><Card className="p-6"><p className="mb-5 text-sm text-[var(--text-muted)]">Motion Lab opens in a new tab. Sign in with your existing Vercel account if asked. Its access protection stays in place.</p><a href="https://motion-lab-pi-seven.vercel.app/" target="_blank" rel="noreferrer" className="inline-flex px-5 py-3 rounded-xl bg-[var(--accent)] text-white">Open Motion Lab</a></Card></Page>;}

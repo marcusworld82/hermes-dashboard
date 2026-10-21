@@ -1,19 +1,23 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
+import { leadResearchTemplate } from "@/lib/server/workflow-gates";
 import { useSearchParams } from "next/navigation";
 import { Plus, Play, Trash2, Loader2, Sparkles, Check, Clock } from "lucide-react";
 import { api, timeAgo, useApi } from "@/lib/client";
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Field, Page, PageHeader, RunsOffNote, Sheet, cx, inputCls } from "@/components/ui";
 
 type Agent = { id: string; name: string; short: string; color: string };
-type Step = { title: string; agent: string; instructions: string; after: number[] };
-type Workflow = { id: string; name: string; description: string; steps: Step[]; schedule: string; runs: { at: number; taskIds: string[]; started: boolean }[] };
+type Step = { title: string; agent: string; instructions: string; after: number[]; humanGate?: boolean };
+type ScheduleRule = { enabled: boolean; frequency: "daily" | "weekly"; time: string; timezone: string; weekday: number };
+type Workflow = { id: string; name: string; description: string; steps: Step[]; schedule: string; scheduleRule?: ScheduleRule; runs: { at: number; taskIds: string[]; started: boolean; approvedGates?: number[] }[] };
 type Data = { workflows: Workflow[]; agents: Agent[]; settings: { agentRuns: boolean } };
-type Draft = { id?: string; name: string; description: string; schedule: string; steps: Step[] };
+type Draft = { id?: string; name: string; description: string; schedule: string; scheduleRule?: ScheduleRule; steps: Step[] };
 
 // Starting points built from the eight agents' jobs.
 const TEMPLATES: Draft[] = [
+  leadResearchTemplate,
   {
     name: "Weekly content sprint",
     description: "Plan, write and check a week of posts.",
@@ -66,13 +70,13 @@ function WorkflowsInner() {
     setDismissedNew(true);
   };
 
-  const run = async (w: Workflow) => {
+  const run = async (w: Workflow, action = "run") => {
     setBusy(w.id);
     setMsg(null);
     setNote(null);
     try {
-      const r = await api<{ taskIds: string[]; started: boolean }>(`/api/workflows/${w.id}`, { method: "POST" });
-      setNote(r.started ? `Started. ${r.taskIds.length} cards are on the Kanban.` : `${r.taskIds.length} cards are on the Kanban, paused until agent runs are on.`);
+      const r = await api<{ taskIds: string[]; started: boolean }>(`/api/workflows/${w.id}`, { method: "POST", json: { action } });
+      setNote(r.started ? `Started. ${r.taskIds.length} cards are on the Kanban.` : `${r.taskIds.length} linked cards created. Check human gates and the agent runs switch before resuming.`);
       reload();
     } catch (e) {
       setMsg((e as Error).message);
@@ -94,6 +98,18 @@ function WorkflowsInner() {
       />
       <RunsOffNote on={data?.settings.agentRuns} />
       <ErrorNote text={error || msg} />
+      <div className="grid md:grid-cols-2 gap-3 mb-6">
+        <Card className="p-5">
+          <h2 className="font-semibold">Lead research pilot</h2>
+          <p className="text-sm text-[var(--text-muted)] mt-2">Estimate cost, approve the cap, discover and score, save to Notion, then review evidence and drafts. Paid discovery uses its own approval screen.</p>
+          <Link href="/discovery" className="text-sm underline inline-block mt-3">Open the research workflow</Link>
+        </Card>
+        <Card className="p-5">
+          <h2 className="font-semibold">Morning run</h2>
+          <p className="text-sm text-[var(--text-muted)] mt-2">Alternating lead discovery and source research at 7 AM New York time. Off until you approve its daily cap in Settings.</p>
+          <Link href="/settings" className="text-sm underline inline-block mt-3">Review the morning schedule</Link>
+        </Card>
+      </div>
       {note && <p className="text-sm bg-[#d1fae5] text-[#065f46] rounded-2xl px-3 py-2.5 mb-4">{note}</p>}
 
       {data?.workflows.length === 0 && (
@@ -105,7 +121,7 @@ function WorkflowsInner() {
         {data?.workflows.map((w) => (
           <Card key={w.id} className="p-4">
             <div className="flex items-start justify-between gap-3">
-              <button className="text-left min-w-0" onClick={() => setDraft({ id: w.id, name: w.name, description: w.description, schedule: w.schedule, steps: w.steps })}>
+              <button className="text-left min-w-0" onClick={() => setDraft({ id: w.id, name: w.name, description: w.description, schedule: w.schedule, scheduleRule: w.scheduleRule, steps: w.steps })}>
                 <p className="font-semibold">{w.name}</p>
                 {w.description && <p className="text-xs text-[#6b7280] mt-0.5">{w.description}</p>}
               </button>
@@ -113,6 +129,8 @@ function WorkflowsInner() {
                 {busy === w.id ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Run
               </Button>
             </div>
+            {w.runs[0] && w.steps.map((step,index) => step.humanGate && !w.runs[0].approvedGates?.includes(index) ? <HumanGate key={index} title={step.title} workflowId={w.id} taskId={w.runs[0].taskIds[index]} onSaved={reload} /> : null)}
+            {w.runs.some((r) => !r.started) && <Button size="sm" variant="light" className="mt-3" onClick={() => run(w, "resume")} disabled={busy === w.id || !data.settings.agentRuns}>Resume paused run</Button>}
             <div className="flex items-center gap-1.5 mt-3 flex-wrap">
               {w.steps.map((s, i) => (
                 <span key={i} className="flex items-center gap-1 text-[11px] text-[#6b7280]">
@@ -123,9 +141,10 @@ function WorkflowsInner() {
               <span className="text-[11px] text-[#9ca3af] ml-auto">{w.steps.length} steps</span>
             </div>
             <div className="flex items-center gap-2 mt-2 text-[11px] text-[#9ca3af]">
-              {w.schedule && (
+              {w.scheduleRule?.enabled && <span className="flex items-center gap-1"><Clock size={12} /> {w.scheduleRule.frequency === "daily" ? "Daily" : ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][w.scheduleRule.weekday]} at {w.scheduleRule.time}, {w.scheduleRule.timezone}</span>}
+              {!w.scheduleRule?.enabled && w.schedule && (
                 <span className="flex items-center gap-1">
-                  <Clock size={12} /> {w.schedule}
+                  <Clock size={12} /> {w.schedule} (timing note)
                 </span>
               )}
               {w.runs[0] && <span>Last run {timeAgo(w.runs[0].at)}</span>}
@@ -218,8 +237,17 @@ function Builder({ draft, agents, runsOn, onSaved }: { draft: Draft; agents: Age
       <Field label="What it does">
         <input value={d.description} onChange={(e) => setD({ ...d, description: e.target.value })} className={inputCls} />
       </Field>
-      <Field label="When it runs" hint="Saved now. Automatic scheduling gets switched on when agent runs are on.">
+      <Field label="When it runs" hint="Timing note only. Use Run to start this workflow.">
         <input value={d.schedule} onChange={(e) => setD({ ...d, schedule: e.target.value })} placeholder="Every Monday 9am, or leave blank to run by hand" className={inputCls} />
+      </Field>
+      <Field label="Automatic schedule" hint="Runs while your Mac and the worker are online. Missed times catch up once on the same day.">
+        <label className="flex items-center gap-2 mb-3 text-sm"><input type="checkbox" checked={d.scheduleRule?.enabled ?? false} onChange={(e) => setD({ ...d, scheduleRule: { frequency: "weekly", time: "09:00", timezone: "America/New_York", weekday: 1, ...d.scheduleRule, enabled: e.target.checked } })} /> Enable scheduled runs</label>
+        {d.scheduleRule?.enabled && <div className="grid grid-cols-2 gap-2">
+          <select className={inputCls} aria-label="Schedule frequency" value={d.scheduleRule.frequency} onChange={(e) => setD({ ...d, scheduleRule: { ...d.scheduleRule!, frequency: e.target.value as "daily" | "weekly" } })}><option value="daily">Daily</option><option value="weekly">Weekly</option></select>
+          <input className={inputCls} aria-label="Schedule time" type="time" value={d.scheduleRule.time} onChange={(e) => setD({ ...d, scheduleRule: { ...d.scheduleRule!, time: e.target.value } })} />
+          {d.scheduleRule.frequency === "weekly" && <select className={inputCls} aria-label="Schedule weekday" value={d.scheduleRule.weekday} onChange={(e) => setD({ ...d, scheduleRule: { ...d.scheduleRule!, weekday: Number(e.target.value) } })}>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => <option key={day} value={i}>{day}</option>)}</select>}
+          <input className={inputCls} aria-label="Schedule time zone" value={d.scheduleRule.timezone} onChange={(e) => setD({ ...d, scheduleRule: { ...d.scheduleRule!, timezone: e.target.value } })} />
+        </div>}
       </Field>
       {d.steps.map((s, i) => (
         <div key={i} className="rounded-2xl border border-[#e8eaee] p-3 mb-2">
@@ -243,6 +271,7 @@ function Builder({ draft, agents, runsOn, onSaved }: { draft: Draft; agents: Age
               </option>
             ))}
           </select>
+          <label className="flex gap-2 text-sm mb-2"><input type="checkbox" checked={!!s.humanGate} onChange={e=>setStep(i,{humanGate:e.target.checked})} />Human gate: never dispatch this step to an agent</label>
           <textarea value={s.instructions} onChange={(e) => setStep(i, { instructions: e.target.value })} rows={2} placeholder="Instructions" className={inputCls} />
           {i > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
@@ -283,4 +312,10 @@ export default function WorkflowsPage() {
       <WorkflowsInner />
     </Suspense>
   );
+}
+
+function HumanGate({title,workflowId,taskId,onSaved}:{title:string;workflowId:string;taskId:string;onSaved:()=>void}) {
+  const [result,setResult]=useState(''),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  async function save(){setBusy(true);setError('');try{await api(`/api/workflows/${workflowId}`,{method:'POST',json:{action:'gate',taskId,confirmed,result}});onSaved();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+  return <details className="border rounded-xl p-3 mt-3"><summary className="text-sm font-medium">{title}</summary><p className="text-xs my-2">Complete earlier steps first. Cost approval happens in Discovery. This records your review and does not start or send anything.</p><textarea aria-label="Gate review result" value={result} onChange={e=>{setResult(e.target.value);setConfirmed(false);}} className={inputCls} placeholder="Completed check, quote or discovery run reference"/><label className="flex gap-2 my-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I checked this step myself.</label><ErrorNote text={error}/><Button size="sm" disabled={busy||!confirmed||result.trim().length<10} onClick={save}>Record human approval</Button></details>;
 }

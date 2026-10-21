@@ -12,22 +12,23 @@ import type { Size } from "../carousel/types.ts";
 // (default gpt-5.6-sol, which was checked on 2026-10-18). Change it in .env.local after updating Codex.
 const IMAGE_MODEL = () => process.env.CODEX_IMAGE_MODEL || "gpt-5.6-sol";
 
-type Opts = { run?: (prompt: string) => Promise<string>; codexHome?: string };
+type Opts = { run?: (prompt: string, references?: string[]) => Promise<string>; codexHome?: string; purpose?: "photo" | "cover"; references?: string[] };
 
-function execCodex(prompt: string): Promise<string> {
+function execCodex(prompt: string, references: string[] = []): Promise<string> {
   return new Promise((resolve, reject) => {
     const cwd = path.join(paths.data, "agent-scratch");
     fs.mkdirSync(cwd, { recursive: true });
-    const child = execFile(paths.codexBin, ["exec", "-m", IMAGE_MODEL(), "--json", "--skip-git-repo-check", "--sandbox", "read-only", "-"], { cwd, timeout: 300_000, maxBuffer: 20 * 1024 * 1024 }, (err, out, errOut) => {
+    const child = execFile(paths.codexBin, ["exec", "-m", IMAGE_MODEL(), "--json", "--skip-git-repo-check", "--sandbox", "read-only", ...references.flatMap((file) => ["--image", file]), "-"], { cwd, timeout: 300_000, maxBuffer: 20 * 1024 * 1024 }, (err, out, errOut) => {
       if (err && /"type":"turn\.failed"/.test(String(out))) return resolve(String(out));
-      if (err) return reject(new Error(/usage limit|rate limit/i.test(String(errOut) + String(out)) ? "Your ChatGPT plan's image limit was reached. Try later or use Higgsfield." : `Codex couldn't make the image (${(String(errOut) || err.message).trim().split("\n").slice(-1)[0]}).`));
+      if (err) return reject(new Error(/usage limit|rate limit/i.test(String(errOut) + String(out)) ? "Your ChatGPT plan's image limit was reached. Try later. No alternate provider was called." : `Codex couldn't make the image (${(String(errOut) || err.message).trim().split("\n").slice(-1)[0]}).`));
       resolve(String(out));
     });
     child.stdin?.end(prompt);
   });
 }
 
-export function codexPrompt(prompt: string, size: Size) {
+export function codexPrompt(prompt: string, size: Size, purpose: "photo" | "cover" = "photo") {
+  if (purpose === "cover") return `Use your built-in image generation tool to create exactly one finished cover poster. Integrated headline text is required as supplied. Aspect ratio: ${size}. No external image service or paid fallback.\n${prompt}`;
   return [
     "Use your built-in image generation tool to create exactly one image. Do not run commands or write files.",
     `Aspect ratio: ${size === "4:5" ? "4:5" : "3:4"} portrait.`,
@@ -39,16 +40,16 @@ export function codexPrompt(prompt: string, size: Size) {
 export async function generateWithCodex(prompt: string, size: Size, opts: Opts = {}): Promise<{ file: string }> {
   if (!prompt.trim()) throw new Error("Describe the image first.");
   const started = Date.now();
-  const out = await (opts.run ?? execCodex)(codexPrompt(prompt.slice(0, 2000), size));
+  const out = await (opts.run ?? execCodex)(codexPrompt(opts.purpose === "cover" ? prompt : prompt.slice(0, 2000), size, opts.purpose), opts.references ?? []);
   const failed = /"type":"turn\.failed".*?"message":"((?:[^"\\]|\\.)*)"/.exec(out)?.[1];
-  if (failed) throw new Error(/not supported/.test(failed) ? `Codex rejected the image model ${IMAGE_MODEL()}. Set CODEX_IMAGE_MODEL in .env.local.` : /limit/i.test(failed) ? "Your ChatGPT plan's image limit was reached. Try later or use Higgsfield." : "Codex couldn't make the image. Try again or use Higgsfield.");
+  if (failed) throw new Error(/not supported/.test(failed) ? `Codex rejected the image model ${IMAGE_MODEL()}. Set CODEX_IMAGE_MODEL in .env.local.` : /limit/i.test(failed) ? "Your ChatGPT plan's image limit was reached. Try later. No alternate provider was called." : "Codex couldn't make the image. No alternate provider was called.");
   const thread = /"thread_id"\s*:\s*"([0-9a-f-]{36})"/i.exec(out)?.[1];
   const home = opts.codexHome ?? process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex");
   const dir = thread ? path.join(home, "generated_images", thread) : null;
   const pngs = dir && fs.existsSync(dir)
     ? fs.readdirSync(dir).filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f)).map((f) => ({ f: path.join(dir, f), t: fs.statSync(path.join(dir, f)).mtimeMs })).filter((x) => x.t >= started - 5000).sort((a, b) => b.t - a.t)
     : [];
-  if (!pngs.length) throw new Error("Codex didn't return an image. Try again or use Higgsfield.");
+  if (!pngs.length) throw new Error("Codex didn't return an image. No alternate provider was called.");
   const bytes = fs.readFileSync(pngs[0].f);
   const ext = path.extname(pngs[0].f).toLowerCase();
   return saveMedia(bytes, ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg", path.basename(pngs[0].f));

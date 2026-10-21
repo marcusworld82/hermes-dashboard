@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { paths } from "./paths";
+import { paths } from "./paths.ts";
 
 // Recast and OpenAdKit are separate apps installed next to the CRM. The dashboard
 // shows them in a frame and can start them, the same way the CRM's Social tab does.

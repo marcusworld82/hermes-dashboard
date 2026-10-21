@@ -39,7 +39,7 @@ const defaultLookup: Lookup = (host) => dns.lookup(host, { all: true });
 // The address check runs inside the socket's own lookup, so the connection always goes to the address that passed.
 const httpsRequest: Requester = (u, safeLookup) =>
   new Promise((resolve, reject) => {
-    const req = https.get(u, { lookup: (h: string, _o: unknown, cb: (err: Error | null, address?: string, family?: number) => void) => safeLookup(h, cb), headers: { "user-agent": "Mozilla/5.0 Hermes reference reader" }, timeout: 10_000 } as https.RequestOptions, (res) =>
+    const req = https.get(u, { lookup: (h: string, _o: unknown, cb: (err: Error | null, address?: string, family?: number) => void) => safeLookup(h, cb), headers: { "user-agent": "Mozilla/5.0 Marcus OS reference reader" }, timeout: 10_000 } as https.RequestOptions, (res) =>
       resolve({ status: res.statusCode ?? 0, location: res.headers.location ?? null, type: String(res.headers["content-type"] ?? ""), body: res }));
     req.on("timeout", () => req.destroy(new Error("The page took too long to answer.")));
     req.on("error", (e) => reject(e.message.includes("private address") ? e : new Error(`Couldn't open that link (${e.message}).`)));

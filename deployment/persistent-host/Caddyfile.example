@@ -1,0 +1,13 @@
+# Review template. Set these variables in /etc/hermes/caddy.env.
+# Every route, including OAuth, requires authentication.
+{$HERMES_PUBLIC_HOST} {
+	basic_auth {
+		{$HERMES_AUTH_USER} {$HERMES_AUTH_HASH}
+	}
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Frame-Options DENY
+	}
+	reverse_proxy 127.0.0.1:3200
+}

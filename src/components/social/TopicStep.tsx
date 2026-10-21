@@ -110,8 +110,10 @@ export function TopicStep({ car, busy, update, generate, replace, flush, setErro
 
       <label className="flex items-center justify-between rounded-2xl border border-[#e8eaee] px-3 py-2.5 mb-4 cursor-pointer">
         <span className="text-sm">Include images<span className="block text-xs text-[#6b7280]">Add or generate photos per slide in Review</span></span>
-        <input type="checkbox" className="w-5 h-5 accent-[#1a1d24]" checked={i.includeImages} onChange={(e) => set({ includeImages: e.target.checked })} />
+        <input type="checkbox" className="w-5 h-5 accent-[#1a1d24]" checked={i.includeImages} onChange={(e) => car.mode === "screenshot" ? update({ template: e.target.checked ? "screenshot-image" : "screenshot", inputs: { ...i, includeImages: e.target.checked } }) : set({ includeImages: e.target.checked })} />
       </label>
+
+      {car.mode === "screenshot" && <Field label="Screenshot template"><Segmented value={car.template === "screenshot-image" || i.includeImages ? "screenshot-image" : "screenshot"} onChange={(template) => update({ template, inputs: { ...i, includeImages: template === "screenshot-image" } })} options={[{ id: "screenshot", label: "Text only" }, { id: "screenshot-image", label: "Text + image" }]} /></Field>}
 
       {car.mode === "creative" && (
         <div className="mb-4">

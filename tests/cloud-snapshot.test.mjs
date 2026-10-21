@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {pruneViews} from '../scripts/cloud-snapshot-policy.mjs';
+test('deleted detail is removed only after a successful authoritative index refresh',()=>{const data={'/api/chat':{threads:[{id:'kept'}]},'/api/chat/deleted':{text:'private deleted text'},'/api/chat/kept':{text:'keep'}};assert.ok(pruneViews(data,new Set())['/api/chat/deleted']);const next=pruneViews(data,new Set(['/api/chat']));assert.equal(next['/api/chat/deleted'],undefined);assert.ok(next['/api/chat/kept'])});
+test('all index IDs remain valid even beyond the prefetch limit',()=>{const threads=Array.from({length:40},(_,i)=>({id:'t'+i}));const data={'/api/chat':{threads},'/api/chat/t39':{text:'keep'},'/api/agents':{agents:[]},'/api/agents/removed':{name:'removed'}};const out=pruneViews(data,new Set(['/api/chat','/api/agents']));assert.ok(out['/api/chat/t39']);assert.equal(out['/api/agents/removed'],undefined)});

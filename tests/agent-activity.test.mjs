@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {summarizeAgentActivity} from '../src/lib/server/agent-activity.ts';
+test('activity comes from cards, never gateway alone',()=>{assert.equal(summarizeAgentActivity([],false).status,'Unknown');assert.equal(summarizeAgentActivity([],true).status,'Idle');assert.equal(summarizeAgentActivity([{id:'a',status:'review',title:'Review'}],true).status,'Waiting for you');assert.equal(summarizeAgentActivity([{id:'a',status:'running',title:'Work'},{id:'b',status:'blocked'}],true).status,'Working');});

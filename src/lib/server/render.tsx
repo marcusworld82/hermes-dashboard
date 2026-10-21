@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { screenshotLayout } from "../carousel/screenshot";
+import { finishedCoverForSlide } from "../carousel/covers";
 import path from "node:path";
 import { ImageResponse } from "next/og";
 /* eslint-disable @next/next/no-img-element -- next/og draws plain <img> elements */
@@ -174,9 +176,9 @@ function screenshot(ctx: Ctx): ReactElement {
   const box = safeBox(car.size);
   const img = dataUrl(slide.images[0]);
   const avatar = dataUrl(kit.avatar ?? undefined);
-  const text = [slide.headline, slide.body].filter((s) => s.trim()).join("\n\n");
-  const imgH = img || (ctx.preview && car.inputs.includeImages) ? Math.round(box.h * 0.38) : 0;
-  const px = fit(ctx, text, "inter", false, { w: box.w, h: box.h - 150 - imgH - (imgH ? 40 : 0) }, (slide.kind === "cover" ? 84 : 62) * (slide.textScale || 1), MIN_BODY + 8, 1.3, "text");
+  const layout = screenshotLayout(car, slide, !!img);
+  const { text, px, imageHeight: imgH } = layout;
+  if (!layout.fits && text.trim()) ctx.flags.push(`Slide ${ctx.index + 1}: text is too long and shrank to the 36px minimum. Split or shorten the copy.`);
   return (
     <div style={{ width: W, height: H, display: "flex", backgroundColor: pal.bg, position: "relative" }}>
       <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -189,7 +191,7 @@ function screenshot(ctx: Ctx): ReactElement {
           </div>
         </div>
         <div style={{ display: "flex", fontFamily: "Inter", fontSize: px, lineHeight: 1.3, color: pal.text, whiteSpace: "pre-wrap" }}>{plain(text)}</div>
-        {img && <img alt="" src={img} width={box.w} height={imgH} style={{ width: box.w, height: imgH, objectFit: "cover", borderRadius: 28, marginTop: 40 }} />}
+        {img && imgH > 0 && <img alt="" src={img} width={box.w} height={imgH} style={{ width: box.w, height: imgH, objectFit: "cover", borderRadius: 28, marginTop: 40 }} />}
         {!img && imgH > 0 && <div style={{ display: "flex", width: box.w, height: imgH, marginTop: 40, border: `4px dashed ${pal.sub}`, borderRadius: 28, alignItems: "center", justifyContent: "center", color: pal.sub, fontFamily: "Inter", fontSize: 32 }}>Add an image</div>}
       </div>
     </div>
@@ -337,6 +339,13 @@ export async function renderSlide(car: Carousel, index: number, opts: { preview?
   if (!slide) throw new Error("That slide doesn't exist.");
   const kit = getBrandKit(car.brandId);
   const { w: W, h: H } = canvas(car.size);
+  const cover = finishedCoverForSlide(car, index);
+  if (cover) {
+    const src = dataUrl(cover.image);
+    if (!src) throw new Error("The finished cover image is missing. Upload it again or return to the template cover.");
+    const res = new ImageResponse(<div style={{ display: "flex", width: W, height: H, backgroundColor: kit.colors.bg }}><img alt="" src={src} width={W} height={H} style={{ width: W, height: H, objectFit: "contain" }} /></div>, { width: W, height: H });
+    return { png: Buffer.from(await res.arrayBuffer()), flags: [] };
+  }
   const ctx: Ctx = { car, kit, slide, index, total: car.slides.length, preview: !!opts.preview, flags: [], W, H };
   const tpl = templateById(car.template);
   const el = car.mode === "screenshot" ? screenshot(ctx)

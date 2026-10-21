@@ -5,11 +5,12 @@ import { useState } from "react";
 import { Loader2, Power } from "lucide-react";
 import { api, useApi } from "@/lib/client";
 import { Card, ErrorNote, Page, PageHeader, cx } from "@/components/ui";
+import MorningRunSettings from "@/components/MorningRunSettings";
 
-type Data = { settings: { agentRuns: boolean; headAgent: string }; paths: Record<string, string> };
+type Data = { settings: { agentRuns: boolean; headAgent: string; obsidianAutoSave: boolean }; paths: Record<string, string> };
 
 const labels: Record<string, string> = {
-  hermesBin: "Hermes",
+  hermesBin: "Agent runtime",
   board: "Pipeline board",
   crmDir: "CRM folder",
   crmUrl: "CRM address",
@@ -39,9 +40,12 @@ export default function SettingsPage() {
 
   return (
     <Page>
-      <PageHeader title="Settings" sub="The one switch that lets agents spend money, and where everything lives." />
+      <PageHeader title="Settings" sub="Agent access, approved schedules and your workspace." />
       <ErrorNote text={error || msg} />
-      <Card className="p-5 mb-4">
+      <Link href="/settings/gmail"><Card className="p-5 mb-4"><p className="font-semibold">Gmail sender</p><p className="text-sm text-[#6b7280] mt-1">Connect your account, verify a test email and review the queue.</p></Card></Link>
+      <Link href="/settings/research"><Card className="p-5 mb-4"><p className="font-semibold">Research and outreach settings</p><p className="text-sm text-[#6b7280] mt-1">Offer, sources, contact details, ranking and daily limits.</p></Card></Link>
+      <MorningRunSettings />
+      <Card className="p-5 my-4">
         <div className="flex items-start gap-4">
           <div className={cx("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0", on ? "bg-[#d1fae5] text-[#047857]" : "bg-[#f4f5f7] text-[#6b7280]")}>
             <Power size={20} />
@@ -65,6 +69,11 @@ export default function SettingsPage() {
             {busy ? <Loader2 size={14} className="animate-spin absolute inset-0 m-auto text-white" /> : <span className={cx("absolute top-1 w-6 h-6 rounded-full bg-white shadow transition-all", on ? "left-7" : "left-1")} />}
           </button>
         </div>
+      </Card>
+
+      <Card className="p-5 mb-4">
+        <div className="flex justify-between gap-4 items-start"><div><p className="font-semibold">Save shipped projects to Obsidian</p><p className="text-sm text-[var(--text-muted)] mt-1">Optional, off by default. Save each completed project’s title and approved summary in your local vault. Existing shipped projects without a note are included. Existing notes and your edits are preserved. Runs while your Mac is awake.</p></div>
+        <input type="checkbox" role="switch" aria-label="Save shipped projects to Obsidian" checked={!!data?.settings.obsidianAutoSave} disabled={busy || !data} onChange={async e => {const enabled=e.target.checked; setBusy(true);setMsg(null);try{setData(await api<Data>("/api/settings",{method:"POST",json:{obsidianAutoSave:enabled}}));}catch(error){setMsg((error as Error).message);}finally{setBusy(false);}}} className="mt-1 h-5 w-5 shrink-0" /></div>
       </Card>
 
       <Card className="p-5 mb-4">

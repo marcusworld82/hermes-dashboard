@@ -19,7 +19,7 @@ export default function HistoryPage() {
   const carousels = list.data?.carousels ?? [];
   return (
     <Page wide>
-      <PageHeader title="History" sub="Every carousel made in Hermes, with what was posted or scheduled." />
+      <PageHeader title="History" sub="Every carousel made in Marcus OS, with what was posted or scheduled." />
       <ErrorNote text={list.error} />
       {list.data && carousels.length === 0 ? <Empty title="No carousels yet" sub="Make one on the Carousels tab." /> : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

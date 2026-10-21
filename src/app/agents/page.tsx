@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Crown, Plus, Users, Trash2, MessageSquare } from "lucide-react";
-import { api, useApi } from "@/lib/client";
+import { api, timeAgo, useApi } from "@/lib/client";
 import { GroupEditor } from "@/components/chat/GroupEditor";
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Page, PageHeader, Sheet } from "@/components/ui";
 
-type Agent = { id: string; name: string; short: string; title: string; color: string; description: string; reportsTo: string | null; isHead: boolean; gateway: string | null; liveModel: string | null; installed: boolean; skills: string[] };
+type Agent = { id: string; name: string; short: string; title: string; color: string; description: string; reportsTo: string | null; isHead: boolean; gateway: string | null; liveModel: string | null; installed: boolean; health: { ok: boolean; checkedAt: number; reason: string } | null; skills: string[] };
 type Group = { id: string; name: string; members: string[]; lead: string };
 type Data = { agents: Agent[]; talk: Record<string, number>; tasks: Record<string, number>; groups: Group[] };
 
@@ -27,6 +27,7 @@ function AgentCard({ a, talk, tasks }: { a: Agent; talk: number; tasks: number }
       </div>
       <div className="flex flex-wrap items-center gap-1.5 mt-3">
         <Badge tone={a.gateway === "running" ? "green" : "gray"}>{a.gateway === "running" ? "Online" : a.installed ? "Offline" : "Not installed"}</Badge>
+        {a.health && <Badge tone={a.health.ok ? "green" : "red"}>{a.health.ok ? `Reply verified ${timeAgo(a.health.checkedAt)}` : a.health.reason}</Badge>}
         {a.liveModel && <Badge>{a.liveModel.replace(/^[a-z-]+\//, "")}</Badge>}
         <span className="text-[11px] text-[#9ca3af] ml-auto">
           {talk} {talk === 1 ? "message" : "messages"} · {tasks} {tasks === 1 ? "card" : "cards"}
@@ -47,8 +48,9 @@ export default function AgentsPage() {
 
   return (
     <Page wide>
-      <PageHeader title="Agents" sub="Your ten agents, running in Hermes. Everyone reports to Jordan, and Quinn checks everything before it reaches you." />
+      <PageHeader title="Agents" sub="Your ten agents, running in Marcus OS. Everyone reports to Jordan, and Quinn checks everything before it reaches you." />
       <ErrorNote text={error} />
+      <Link href="/muse" className="block mb-5"><Card className="p-5"><div className="flex gap-3 items-center"><Avatar name="Muse" color="var(--accent)"/><div><p className="font-semibold">Muse</p><p className="text-sm text-[#6b7280]">Manual research, runs on Meta’s site</p></div><Badge>Manual</Badge></div></Card></Link>
 
       {head && (
         <div className="max-w-md mx-auto mb-3">

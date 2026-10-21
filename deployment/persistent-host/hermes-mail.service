@@ -1,0 +1,24 @@
+[Unit]
+Description=Hermes approved Gmail queue worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/opt/hermes/app
+EnvironmentFile=/etc/hermes/runtime.env
+ExecStart=/usr/local/bin/node scripts/cloud-mail-server.mjs
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=60
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hermes
+
+[Install]
+WantedBy=multi-user.target

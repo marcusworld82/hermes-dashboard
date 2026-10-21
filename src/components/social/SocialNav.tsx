@@ -7,7 +7,11 @@ import { cx } from "@/components/ui";
 const TABS = [
   { href: "/social", label: "Calendar" },
   { href: "/social/carousels", label: "Carousels" },
+  { href: "/social/content", label: "Content Machine" },
   { href: "/social/history", label: "History" },
+  { href: "/social/motion-lab", label: "Motion Lab" },
+  { href: "/recast", label: "Recast" },
+  { href: "/openadkit", label: "OpenAdKit" },
 ];
 
 // Sub-menu shared by every Social page. Video, Stories and the rest join here later.

@@ -1,8 +1,11 @@
+import { requireRuns } from './settings.ts';
+import { withAgentRun, checkAgentRun } from './agent-controls.ts';
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { paths } from "./paths";
+import { paths } from "./paths.ts";
+import { readBoardCounts, readBoardTasks } from "./board-read.ts";
 
 // Thin wrapper over the hermes CLI. Arguments are passed as a list (no shell),
 // so user text can never be run as a command.
@@ -44,8 +47,8 @@ export function hermesInstalled() {
 
 function run(args: string[], opts: { timeoutMs?: number; input?: string; cwd?: string; profile?: string } = {}) {
   return new Promise<string>((resolve, reject) => {
-    if (!hermesInstalled()) return reject(new HermesError(`Hermes not found at ${paths.hermesBin}`));
-    const env = { ...process.env, COLUMNS: "220", NO_COLOR: "1", TERM: "dumb" };
+    if (!hermesInstalled()) return reject(new HermesError(`Marcus OS not found at ${paths.hermesBin}`));
+    const env = { ...process.env, COLUMNS: "220", NO_COLOR: "1", TERM: "dumb", HERMES_KANBAN_BOARD: paths.board };
     const argv = opts.profile ? ["-p", opts.profile, ...args] : args;
     const child = execFile(
       paths.hermesBin,
@@ -54,21 +57,19 @@ function run(args: string[], opts: { timeoutMs?: number; input?: string; cwd?: s
       (err, stdout, stderr) => {
         if (err) {
           const msg = (stderr || stdout || err.message).toString().trim().split("\n").slice(-4).join(" ");
-          return reject(new HermesError(msg || "Hermes command failed"));
+          return reject(new HermesError(msg || "Marcus OS command failed"));
         }
         resolve(stdout.toString());
       },
     );
-    if (opts.input !== undefined) {
-      child.stdin?.write(opts.input);
-      child.stdin?.end();
-    }
+    if (opts.input !== undefined) child.stdin?.write(opts.input);
+    child.stdin?.end();
   });
 }
 
 function json<T>(text: string): T {
   const start = text.search(/[[{]/);
-  if (start < 0) throw new HermesError("Hermes returned no data");
+  if (start < 0) throw new HermesError("Marcus OS returned no data");
   return JSON.parse(text.slice(start)) as T;
 }
 
@@ -77,26 +78,33 @@ const kb = (board: string, ...args: string[]) => ["kanban", "--board", board, ..
 // ---------- boards ----------
 
 export async function ensureBoard(board = paths.board) {
-  const boards = json<{ slug: string }[]>(await run(["kanban", "boards", "list", "--json"]));
+  const boards = await listBoards();
   if (!boards.some((b) => b.slug === board)) {
-    await run(["kanban", "boards", "create", board, "--name", "Command Center", "--description", "Hermes Dashboard pipeline"]);
+    await run(["kanban", "boards", "create", board, "--name", "Command Center", "--description", "Marcus OS Dashboard pipeline"]);
   }
 }
 
+function boardFile(board: string) {
+  if (!/^[a-z0-9_-]{1,80}$/.test(board)) throw new HermesError("Choose a valid board.");
+  return board === "default" ? path.join(paths.hermesHome, "kanban.db") : path.join(paths.hermesHome, "kanban", "boards", board, "kanban.db");
+}
+
 export async function listBoards() {
-  return json<{ slug: string; name: string; counts?: Record<string, number> }[]>(
-    await run(["kanban", "boards", "list", "--json"]),
-  );
+  const root = path.join(paths.hermesHome, "kanban", "boards");
+  const slugs = new Set<string>();
+  if (fs.existsSync(boardFile("default"))) slugs.add("default");
+  try { for (const entry of fs.readdirSync(root, { withFileTypes: true })) if (entry.isDirectory() && /^[a-z0-9_-]{1,80}$/.test(entry.name) && fs.existsSync(boardFile(entry.name))) slugs.add(entry.name); } catch {}
+  return [...slugs].map((slug) => {
+    let name = slug === "default" ? "Default" : slug;
+    try { name = JSON.parse(fs.readFileSync(path.join(root, slug, "board.json"), "utf8")).name || name; } catch {}
+    return { slug, name };
+  });
 }
 
 // ---------- tasks ----------
 
 export async function listTasks(board = paths.board, opts: { archived?: boolean; status?: TaskStatus; assignee?: string } = {}) {
-  const args = kb(board, "list", "--json", "--sort", "created-desc");
-  if (opts.archived) args.push("--archived");
-  if (opts.status) args.push("--status", opts.status);
-  if (opts.assignee) args.push("--assignee", opts.assignee);
-  return json<Task[]>(await run(args));
+  return readBoardTasks(boardFile(board), opts) as Task[];
 }
 
 export async function showTask(id: string, board = paths.board) {
@@ -111,8 +119,11 @@ export async function createTask(input: {
   skills?: string[];
   blocked?: boolean;
   board?: string;
+  idempotencyKey?: string;
 }) {
   const board = input.board ?? paths.board;
+  if (!input.blocked) requireRuns();
+  if (!input.blocked) checkAgentRun(input.assignee || 'jordan', {operation:'Create runnable board card',billing:'unknown'});
   const args = kb(board, "create", input.title, "--created-by", "marcus", "--json");
   // Bodies go through a temp file so new lines and dashes survive.
   let bodyFile: string | null = null;
@@ -121,12 +132,14 @@ export async function createTask(input: {
     fs.writeFileSync(bodyFile, input.body);
     args.push("--body-file", bodyFile);
   }
+  if (input.idempotencyKey) args.push("--idempotency-key", input.idempotencyKey);
   if (input.assignee) args.push("--assignee", input.assignee);
   for (const p of input.parents ?? []) args.push("--parent", p);
   for (const s of input.skills ?? []) args.push("--skill", s);
   if (input.blocked) args.push("--initial-status", "blocked");
   try {
-    return json<Task>(await run(args));
+    if(input.blocked) return json<Task>(await run(args));
+    return withAgentRun(input.assignee||'jordan',{operation:'Create runnable board card',billing:'unknown'},async()=>({value:json<Task>(await run(args))}));
   } finally {
     if (bodyFile) fs.rmSync(bodyFile, { force: true });
   }
@@ -140,8 +153,12 @@ export async function blockTask(id: string, reason: string, board = paths.board)
   await run(kb(board, "block", id, reason, "--kind", "needs_input"));
 }
 
-export async function unblockTask(id: string, board = paths.board) {
-  await run(kb(board, "unblock", id));
+export async function unblockTask(id: string, board = paths.board, options: {workflowApproved?: true} = {}) {
+  requireRuns();
+  const detail = await showTask(id, board);
+  if (detail.task.body?.includes('[HERMES_HUMAN_GATE]')) throw Error('Approve this human gate from its workflow. It cannot run as an agent task.');
+  if (detail.task.body?.includes('[HERMES_GATED_WORKFLOW]') && !options.workflowApproved) throw Error('Resume this card through its workflow so human approvals are checked.');
+  await withAgentRun(detail.task.assignee || 'jordan', {operation:`Dispatch board card ${id}`,billing:'unknown'}, async()=>{await run(kb(board, "unblock", id));return {value:undefined};});
 }
 
 export async function archiveTask(id: string, board = paths.board) {
@@ -153,13 +170,14 @@ export async function completeTask(id: string, result: string, board = paths.boa
 }
 
 export async function assignTask(id: string, profile: string, board = paths.board) {
+  const detail = await showTask(id, board);
+  if (!['blocked','done','archived'].includes(detail.task.status)) requireRuns();
+  if (!['blocked','done','archived'].includes(detail.task.status)) checkAgentRun(profile,{operation:'Assign runnable board card',billing:'unknown'});
   await run(kb(board, "assign", id, profile));
 }
 
 export async function boardStats(board = paths.board) {
-  return json<{ by_status: Record<string, number>; by_assignee: Record<string, number> }>(
-    await run(kb(board, "stats", "--json")),
-  );
+  return readBoardCounts(boardFile(board));
 }
 
 // ---------- profiles ----------
@@ -168,6 +186,10 @@ export type Profile = { id: string; name: string; model: string; gateway: string
 
 export async function listProfiles(): Promise<Profile[]> {
   const out = await run(["profile", "list"]);
+  return parseProfiles(out);
+}
+
+export function parseProfiles(out: string): Profile[] {
   const rows: Profile[] = [];
   for (const raw of out.split("\n")) {
     const line = raw.replace(/^[\s◆*]+/, "");
@@ -192,10 +214,14 @@ export async function listProfiles(): Promise<Profile[]> {
 
 // Sends one message to a profile and returns the final reply text.
 export async function askProfile(profile: string, prompt: string, timeoutMs = 240_000) {
+  requireRuns();
   const cwd = path.join(paths.data, "agent-scratch");
   fs.mkdirSync(cwd, { recursive: true });
-  const out = await run(["-z", prompt], { profile: profile === "default" ? undefined : profile, timeoutMs, cwd });
-  return out.trim();
+  const context = "Dashboard policy: use the current dashboard Kanban board. Do not save to Obsidian. Do not publish, schedule posts, or send external messages from chat. Those actions require the dedicated review and approval controls.\n\n";
+  return withAgentRun(profile==='default'?'jordan':profile,{operation:'Marcus OS profile chat',billing:'unknown'},async()=>{
+    const out = await run(["-z", context + prompt], { profile: profile === "default" ? undefined : profile, timeoutMs, cwd });
+    return {value:out.trim(),lastMessage:out.trim()};
+  });
 }
 
 // ---------- skills and MCP ----------
@@ -224,13 +250,36 @@ export async function listMcp() {
 }
 
 export async function addMcp(input: { name: string; url?: string; command?: string; args?: string[] }) {
+  if (input.name.toLowerCase() === "bigin" && input.url) {
+    const runtime = JSON.parse(await run(["--print-runtime-command"])) as string[];
+    if (!path.isAbsolute(runtime[0] || "")) throw new HermesError("Marcus OS runtime unavailable.");
+    return new Promise<string>((resolve, reject) => {
+      const child = execFile(runtime[0], ["-I", path.join(process.cwd(), "scripts/add-bigin-mcp.py")], { timeout: 60_000, maxBuffer: 65536 }, (err, stdout) => {
+        try {
+          const result = JSON.parse(stdout.trim().split("\n").at(-1) || "{}");
+          if (err || result.ok !== true) {
+            const message = result.exception === "OAuthNonInteractiveError"
+              ? "Zoho sign-in is required. Complete Bigin authorization in an interactive Marcus OS session before saving here."
+              : result.category === "401" || result.category === "403"
+                ? "Zoho rejected authorization. Reconnect your Bigin account before retrying."
+                : "Bigin was not saved. Check the complete Server URL and Zoho authorization, then retry.";
+            return reject(new HermesError(message));
+          }
+          resolve(`Bigin connected. ${result.toolCount} tools verified and saved.`);
+        } catch { reject(new HermesError("Bigin registration failed. No connection was confirmed.")); }
+      });
+      child.stdin?.end(JSON.stringify({url: input.url}));
+    });
+  }
   const args = ["mcp", "add", input.name];
   if (input.url) args.push("--url", input.url);
   if (input.command) {
     args.push("--command", input.command);
     if (input.args?.length) args.push("--args", ...input.args);
   }
-  return run(args, { timeoutMs: 90_000 });
+  const output = await run(args, { timeoutMs: 90_000 });
+  if (!output.includes(`Saved '${input.name}'`)) throw new HermesError("The server was not saved. This connection requires interactive setup in Marcus OS Terminal.");
+  return "MCP server configuration saved. Test the connection before using it.";
 }
 
 export async function hermesStatus() {

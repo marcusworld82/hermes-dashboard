@@ -34,7 +34,7 @@ export function createCarousel(partial: Partial<Carousel>): Carousel {
     ideas: [], news: [], hooks: [], hook: "", slides: [], caption: "", clone: { cover: null, inner: [], spec: null }, flags: [], status: "draft",
     createdAt: now, updatedAt: now,
     ...partial,
-    inputs: { topic: "", steer: "", context: "", referenceUrl: "", referenceText: "", includeImages: false, goal: "saves", structure: "Listicle", slideCount: 7, badge: "blue", output: "carousel", ...(partial.inputs ?? {}) },
+    inputs: { topic: "", steer: "", context: "", referenceUrl: "", referenceText: "", includeImages: partial.template === "screenshot-image", goal: "saves", structure: "Listicle", slideCount: 7, badge: "blue", output: "carousel", ...(partial.inputs ?? {}) },
   };
   write(car);
   return car;
@@ -55,6 +55,7 @@ export function listCarousels(): Carousel[] {
 export function updateCarousel(id: string, patch: Partial<Carousel>): Carousel {
   const cur = getCarousel(id);
   const next: Carousel = { ...cur, ...patch, id: cur.id, createdAt: cur.createdAt, updatedAt: new Date().toISOString(), inputs: { ...cur.inputs, ...(patch.inputs ?? {}) } };
+  if (next.cover && (!/^[a-z0-9_-]+\.(png|jpg|webp)$/.test(next.cover.image) || !["upload", "marcus"].includes(next.cover.source) || next.cover.fit !== "contain")) throw new Error("Choose a valid finished cover image.");
   const n = next.inputs.slideCount;
   if (!Number.isInteger(n) || n < 3 || n > 10) throw new Error("Slide count must be 3 to 10.");
   if (next.slides.length > 10) throw new Error("A carousel can have up to 10 slides.");

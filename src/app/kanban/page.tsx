@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, MessageSquare, Pause, Play, Archive } from "lucide-react";
+import { Loader2, MessageSquare, Pause, Play, Archive, Plus, Check } from "lucide-react";
 import { api, timeAgo, useApi } from "@/lib/client";
 import { Avatar, Badge, Button, ErrorNote, Page, PageHeader, Segmented, Sheet, cx, inputCls, statusTone } from "@/components/ui";
 
@@ -26,6 +26,7 @@ const COLS = [
   { id: "running", label: "Running", dot: "bg-blue-500" },
   { id: "review", label: "Review", dot: "bg-violet-500" },
   { id: "blocked", label: "Blocked", dot: "bg-amber-500" },
+  { id: "scheduled", label: "Scheduled", dot: "bg-teal-500" },
   { id: "done", label: "Done", dot: "bg-emerald-500" },
 ];
 
@@ -35,6 +36,19 @@ export default function KanbanPage() {
   const { data: team } = useApi<{ agents: Agent[] }>("/api/agents");
   const [col, setCol] = useState("todo");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const create = async () => {
+    setSaving(true); setCreateError(null);
+    try {
+      const card = await api<Task>("/api/kanban", { method: "POST", json: { title, instructions, assignee, board } });
+      setCreating(false); setTitle(""); setInstructions(""); setAssignee(""); reload(); setOpenId(card.id);
+    } catch (error) { setCreateError((error as Error).message); } finally { setSaving(false); }
+  };
   const who = Object.fromEntries((team?.agents ?? []).map((a) => [a.id, a]));
   const tasks = data?.tasks ?? [];
   const count = (c: string) => tasks.filter((t) => t.status === c).length;
@@ -43,7 +57,7 @@ export default function KanbanPage() {
     <Page wide>
       <PageHeader
         title="Kanban"
-        sub="Every card on your Hermes boards. Cards with links wait for the cards before them, then start on their own."
+        sub="Every card on your Marcus OS boards. Cards with links wait for the cards before them, then start on their own."
         action={
           <select value={board} onChange={(e) => setBoard(e.target.value)} className="min-h-11 bg-white border border-[#e8eaee] rounded-2xl px-3 text-base md:text-sm max-w-[44vw]">
             {(data?.boards ?? [{ slug: board, name: board }]).map((b) => (
@@ -54,7 +68,18 @@ export default function KanbanPage() {
           </select>
         }
       />
+      <div className="mb-4"><Button onClick={() => setCreating(true)}><Plus size={16} /> New task</Button></div>
       <ErrorNote text={error} />
+      <Sheet open={creating} onClose={() => setCreating(false)} title="New task">
+        <ErrorNote text={createError} />
+        <div className="space-y-3">
+          <input className={inputCls} aria-label="Task title" placeholder="What needs doing?" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          <textarea className={inputCls} aria-label="Task instructions" placeholder="Instructions and expected result" value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={5} />
+          <select className={inputCls} aria-label="Assign agent" value={assignee} onChange={(e) => setAssignee(e.target.value)}><option value="">Unassigned</option>{(team?.agents ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+          <p className="text-xs text-[#6b7280]">Saved paused. Review the card, then release it to start.</p>
+          <Button disabled={!title.trim() || saving} onClick={create}>{saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Create task</Button>
+        </div>
+      </Sheet>
       <Segmented className="md:hidden mb-3" value={col} onChange={setCol} options={COLS.map((c) => ({ id: c.id, label: c.label, count: count(c.id) }))} />
       <div className="md:overflow-x-auto md:pb-3 no-scrollbar">
         <div className="md:flex md:gap-3 md:min-w-max">
@@ -151,6 +176,9 @@ function TaskSheet({ id, board, who, onClose, onChanged }: { id: string | null; 
             </div>
           )}
 
+          <label className="block text-xs text-[#6b7280] mb-4">Assigned agent
+            <select className={cx(inputCls, "mt-1")} aria-label="Assigned agent" value={t.assignee ?? ""} disabled={!!busy || t.status === "running" || t.status === "done"} onChange={(e) => { if (e.target.value) void act("assign", { profile: e.target.value }); }}><option value="">Unassigned</option>{Object.values(who).map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select>
+          </label>
           <div className="flex flex-wrap gap-2 mb-5">
             {t.status === "blocked" ? (
               <Button size="sm" variant="light" onClick={() => act("unblock")} disabled={!!busy}>
@@ -161,6 +189,7 @@ function TaskSheet({ id, board, who, onClose, onChanged }: { id: string | null; 
                 <Pause size={14} /> Pause
               </Button>
             ) : null}
+            {t.status !== "done" && <Button size="sm" variant="light" onClick={() => act("complete", { text })} disabled={!!busy || !text.trim()}><Check size={14} /> Mark done with result below</Button>}
             <Button size="sm" variant="ghost" onClick={() => act("archive")} disabled={!!busy}>
               <Archive size={14} /> Archive
             </Button>
@@ -179,7 +208,7 @@ function TaskSheet({ id, board, who, onClose, onChanged }: { id: string | null; 
             ))}
           </div>
           <div className="flex gap-2 mb-5">
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a comment" className={inputCls} />
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a comment or completion result" className={inputCls} />
             <Button onClick={() => act("comment", { text })} disabled={!text.trim() || !!busy} aria-label="Add comment">
               {busy === "comment" ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}
             </Button>

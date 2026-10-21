@@ -47,7 +47,7 @@ export function logProject(input: {
     ...input.steps.map((s) => `- **${s.title}** (${s.agent}): ${s.result ?? "no result recorded"}`),
     "",
     "## Where it lives",
-    `Hermes task \`${input.taskId}\` on board \`${input.board}\`. Run \`hermes kanban --board ${input.board} show ${input.taskId}\` for the full history.`,
+    `Marcus OS task \`${input.taskId}\` on board \`${input.board}\`. Run \`hermes kanban --board ${input.board} show ${input.taskId}\` for the full history.`,
     "",
   ];
   fs.writeFileSync(file, lines.join("\n"));

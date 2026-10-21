@@ -12,15 +12,14 @@ const outfit = Outfit({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#f7f6f4",
+  themeColor: "#faf7f2",
 };
 
 export const metadata: Metadata = {
-  title: "Hermes",
-  description: "Marcus's command center for Hermes agents",
-  appleWebApp: { capable: true, title: "Hermes", statusBarStyle: "default" },
+  title: "Marcus OS",
+  description: "Marcus's command center for agents, content and outreach",
+  appleWebApp: { capable: true, title: "Marcus OS", statusBarStyle: "default" },
 };
 
 export default function RootLayout({

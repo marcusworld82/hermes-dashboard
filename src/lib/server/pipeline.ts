@@ -1,9 +1,9 @@
-import { paths } from "./paths";
-import { readJson, updateJson, now } from "./store";
-import { getSettings, requireRuns } from "./settings";
-import * as hermes from "./hermes";
-import { getAgents, qaId, rosterForPrompt } from "./agents";
-import { logProject } from "./obsidian";
+import { saveShippedNote } from "./obsidian-ship.ts";
+import { paths } from "./paths.ts";
+import { readJson, updateJson, writeJson, now } from "./store.ts";
+import { getSettings, requireRuns } from "./settings.ts";
+import * as hermes from "./hermes.ts";
+import { getAgents, qaId, rosterForPrompt } from "./agents.ts";
 
 // Inbox to Shipped. Four stages on top of the real Hermes board:
 // capture (idea parked as a blocked card) -> gate (plan waiting for Marcus)
@@ -81,7 +81,7 @@ export async function capture(idea: string) {
   await hermes.ensureBoard();
   const task = await hermes.createTask({
     title: titleFrom(text),
-    body: `${text}\n\n(Captured from the Hermes Dashboard. Waiting for a plan and Marcus's approval.)`,
+    body: `${text}\n\n(Captured from Marcus OS. Waiting for a plan and Marcus's approval.)`,
     blocked: true,
   });
   const item: PipelineItem = {
@@ -183,6 +183,7 @@ export async function approve(id: string) {
   const stepTasks: Record<string, string> = {};
   for (const step of item.plan.steps) {
     const task = await hermes.createTask({
+      idempotencyKey: `pipeline:${id}:${step.key}`,
       title: step.title,
       body: `${step.instructions}\n\nPart of: ${item.title}\nOriginal idea: ${item.idea}`,
       assignee: step.agent,
@@ -192,6 +193,7 @@ export async function approve(id: string) {
     stepTasks[step.key] = task.id;
   }
   const qc = await hermes.createTask({
+    idempotencyKey: `pipeline:${id}:quality`,
     title: `Quality check: ${item.title}`.slice(0, 120),
     body: `Check every deliverable for "${item.title}" against the approved plan before it ships. List what passes, what fails and what is missing.\n\nPlan:\n${item.plan.summary}`,
     assignee: qaId(),
@@ -223,34 +225,6 @@ export async function reject(id: string, reason?: string) {
   return save(id, { stage: "rejected" });
 }
 
-async function ship(item: PipelineItem, byId: Map<string, hermes.Task>) {
-  const agents = await getAgents();
-  const names = Object.fromEntries(agents.map((a) => [a.id, a.name]));
-  const steps = (item.plan?.steps ?? []).map((s) => {
-    const t = byId.get(item.stepTasks[s.key]);
-    return { title: s.title, agent: names[s.agent] ?? s.agent, result: t?.result ?? null };
-  });
-  const qc = item.qcTask ? byId.get(item.qcTask) : undefined;
-  if (qc) steps.push({ title: "Quality check", agent: "Quality Control", result: qc.result });
-  let vaultNote: string | null = null;
-  try {
-    vaultNote = logProject({
-      title: item.title,
-      idea: item.idea,
-      plan: item.plan ? planText(item.plan, names) : "",
-      steps,
-      taskId: item.id,
-      board: paths.board,
-    });
-  } catch {
-    vaultNote = null;
-  }
-  try {
-    await hermes.completeTask(item.id, `Shipped. ${steps.length} steps done.${vaultNote ? ` Logged to Obsidian: ${vaultNote}` : ""}`);
-  } catch {}
-  return save(item.id, { stage: "shipped", shippedAt: now(), vaultNote });
-}
-
 export async function listPipeline(): Promise<{ items: PipelineView[]; offline: string | null }> {
   const all = Object.values(db()).filter((i) => i.stage !== "rejected");
   let tasks: hermes.Task[] = [];
@@ -265,7 +239,7 @@ export async function listPipeline(): Promise<{ items: PipelineView[]; offline: 
   for (let item of all) {
     if (!offline && item.stage === "execute") {
       const ids = [...Object.values(item.stepTasks), item.qcTask].filter(Boolean) as string[];
-      if (ids.length && ids.every((t) => byId.get(t)?.status === "done")) item = await ship(item, byId);
+      if (ids.length && ids.every((t) => byId.get(t)?.status === "done")) item = { ...item, stage: "shipped", shippedAt: item.shippedAt ?? Math.max(...ids.map((id) => byId.get(id)?.completed_at ?? item.approvedAt ?? item.createdAt)) };
     }
     const steps: StepView[] = (item.plan?.steps ?? []).map((s) => {
       const t = byId.get(item.stepTasks[s.key]);
@@ -280,4 +254,29 @@ export async function listPipeline(): Promise<{ items: PipelineView[]; offline: 
   }
   items.sort((a, b) => b.createdAt - a.createdAt);
   return { items, offline };
+}
+
+// A mutation belongs to the worker's POST tick, never to dashboard polling.
+export async function reconcilePipeline() {
+  const candidates = Object.values(db()).filter((item) => item.stage === "execute");
+  const tasks = candidates.length ? await hermes.listTasks(paths.board, { archived: true }) : [];
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const completed: string[] = [];
+  const noteErrors: string[] = [];
+  for (const item of candidates) {
+    const ids = [...Object.values(item.stepTasks), item.qcTask].filter(Boolean) as string[];
+    if (!ids.length || !ids.every((id) => byId.get(id)?.status === "done")) continue;
+    const current = byId.get(item.id);
+    if (current?.status !== "done") await hermes.completeTask(item.id, `Completed ${ids.length} approved steps, including quality review.`);
+    save(item.id, { stage: "shipped", shippedAt: now(), vaultNote: null });
+    completed.push(item.id);
+  }
+  if (getSettings().obsidianAutoSave && process.env.HERMES_DEPLOYMENT_MODE !== 'persistent-host') {
+    for (const item of Object.values(db()).filter(i => i.stage === 'shipped' && !i.vaultNote)) {
+      try { const vaultNote = saveShippedNote(paths.vault, paths.vaultPipelineFolder, item, true); if (vaultNote) save(item.id, {vaultNote}); }
+      catch { noteErrors.push(`Could not save the shipped note for ${item.id}. Check the vault path and permissions.`); }
+    }
+  }
+  writeJson("obsidian-export-status", {checkedAt: now(), enabled: getSettings().obsidianAutoSave, errors: noteErrors});
+  return { completed, noteErrors };
 }

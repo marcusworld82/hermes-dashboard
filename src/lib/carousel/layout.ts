@@ -18,16 +18,21 @@ type FitOpts = { box: { w: number; h: number }; maxPx: number; minPx: number; li
 // Estimates the largest font size (stepping down 2px) at which the text fits the box.
 // charWidth is the average glyph width as a fraction of the font size for the chosen font.
 export function fitText(text: string, opts: FitOpts): { px: number; lines: number; fits: boolean } {
-  const words = text.trim().split(/\s+/).filter(Boolean);
   const measure = (px: number) => {
     const perLine = Math.max(1, Math.floor(opts.box.w / (opts.charWidth * px)));
-    let lines = words.length ? 1 : 0;
-    let used = 0;
-    for (const w of words) {
-      const len = Math.min(w.length, perLine);
-      if (used === 0) used = len;
-      else if (used + 1 + len <= perLine) used += 1 + len;
-      else { lines++; used = len; }
+    let lines = 0;
+    if (text.trim()) for (const paragraph of text.split(/\r?\n/)) {
+      let used = 0;
+      lines++;
+      for (const word of paragraph.trim().split(/\s+/).filter(Boolean)) {
+        const len = word.length;
+        if (used && used + 1 + len <= perLine) used += 1 + len;
+        else {
+          if (used) lines++;
+          lines += Math.max(0, Math.ceil(len / perLine) - 1);
+          used = ((len - 1) % perLine) + 1;
+        }
+      }
     }
     return { lines, fits: lines * px * opts.lineHeight <= opts.box.h };
   };

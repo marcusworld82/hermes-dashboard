@@ -64,8 +64,12 @@ export type Carousel = {
   hook: string;
   slides: Slide[];
   caption: string;
+  cover?: { image: string; source: "upload" | "marcus"; fit: "contain"; styleId?: number } | null;
   clone: { cover: string | null; inner: string[]; spec: CloneSpec | null };
   flags: string[];
+  // Set when the carousel was started from a planned calendar entry.
+  planId?: string;
+  planDate?: string;
   status: "draft" | "scheduled" | "posted";
   createdAt: string;
   updatedAt: string;

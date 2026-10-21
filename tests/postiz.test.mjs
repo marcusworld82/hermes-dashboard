@@ -38,7 +38,7 @@ function fakeClient({ scheduleError } = {}) {
   };
 }
 const slidePng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-const input = (carouselId) => ({ carouselId, channelIds: ['chan1'], when: '2026-10-20T15:00:00.000Z', now: false, caption: 'Hi', slides: [slidePng, slidePng] });
+const input = (carouselId) => ({ carouselId, channelIds: ['chan1'], when: new Date(Date.now() + 86_400_000).toISOString(), now: false, caption: 'Hi', slides: [slidePng, slidePng] });
 
 test('a confirmed schedule stores the Postiz id', async () => {
   const client = fakeClient();

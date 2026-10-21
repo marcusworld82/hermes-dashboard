@@ -27,7 +27,7 @@ const quotes = (g.__hermesHfQuotes ??= new Map<string, Pending>());
 export const higgsfieldReady = () => !!(process.env.HF_API_KEY_ID && process.env.HF_API_KEY_SECRET);
 export function hfAuth() {
   const id = process.env.HF_API_KEY_ID?.trim(), secret = process.env.HF_API_KEY_SECRET?.trim();
-  if (!id || !secret) throw new Error("Add HF_API_KEY_ID and HF_API_KEY_SECRET to .env.local, then restart Hermes.");
+  if (!id || !secret) throw new Error("Add HF_API_KEY_ID and HF_API_KEY_SECRET to .env.local, then restart Marcus OS.");
   return `Key ${id}:${secret}`;
 }
 
@@ -102,6 +102,6 @@ export async function generateWithHiggsfield(quoteId: string, opts: GenOpts = {}
       return { ...saveMedia(bytes, /jpe?g/.test(type) ? "image/jpeg" : /webp/.test(type) ? "image/webp" : "image/png", "higgsfield"), requestId };
     }
     if (s.status === "failed" || s.status === "nsfw" || s.status === "canceled") throw new Error(s.status === "nsfw" ? "Higgsfield blocked this image for content. You weren't charged." : "Higgsfield couldn't make this image. You weren't charged.");
-    if (Date.now() > deadline) throw new Error(`Still generating on Higgsfield (request ${requestId}). Check it there; Hermes won't submit again.`);
+    if (Date.now() > deadline) throw new Error(`Still generating on Higgsfield (request ${requestId}). Check it there; Marcus OS won't submit again.`);
   }
 }

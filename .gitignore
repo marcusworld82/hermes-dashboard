@@ -43,3 +43,22 @@ next-env.d.ts
 # dashboard local data (threads, plans, settings)
 /data/
 !.env.example
+.env*.local
+
+# Private local state and generated verification artifacts
+.claude/
+.superpowers/
+**/node_modules/
+**/.next/
+**/data/
+**/__pycache__/
+*.pyc
+/docs/handover-*/
+/docs/carousel-previews/
+/docs/cover-options/
+/docs/deployments/
+/docs/*.png
+/docs/cloud-verification.json
+
+# Generated TypeScript build state
+*.tsbuildinfo

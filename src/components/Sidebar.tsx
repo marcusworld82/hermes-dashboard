@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronDown, Plus, Search } from "lucide-react";
 import { sections, settingsItem, isActive, type NavItem } from "./shell/nav";
 import { cx } from "./ui";
+import { useApi } from "@/lib/client";
 
 function Item({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const pathname = usePathname();
@@ -28,8 +29,21 @@ function Item({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 }
 
 // Desktop sidebar. Hidden on phones by CSS, so there is no flash or layout jump.
+const sectionKey = "hermes-sidebar-sections";
+function subscribeSections(callback:()=>void) {
+  window.addEventListener("storage",callback); window.addEventListener("hermes-sidebar",callback);
+  return ()=>{window.removeEventListener("storage",callback);window.removeEventListener("hermes-sidebar",callback);};
+}
+function readSections(){try{return localStorage.getItem(sectionKey)||"{}";}catch{return "{}";}}
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const [collapsed, setCollapsed] = useState(false);
+  const { data: history } = useApi<{threads:{id:string;title:string}[]}>("/api/chat/recent", 30000);
+  const saved = useSyncExternalStore(subscribeSections,readSections,()=>"{}");
+  let closed:Record<string,boolean>={Team:true,Business:true};
+  try {closed={...closed,...JSON.parse(saved)};} catch {}
+  function toggleSection(title:string){
+    try {localStorage.setItem(sectionKey,JSON.stringify({...closed,[title]:!closed[title]}));window.dispatchEvent(new Event("hermes-sidebar"));}catch{}
+  }
   return (
     <motion.aside
       initial={false}
@@ -40,8 +54,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       <div className="flex items-center justify-between px-4 h-16">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#1a1d24] flex items-center justify-center text-white text-xs font-semibold">H</div>
-            <span className="font-semibold tracking-tight">Hermes</span>
+            <div className="w-8 h-8 rounded-xl bg-[#1a1d24] flex items-center justify-center text-white text-xs font-semibold">M</div>
+            <span className="font-semibold tracking-tight">Marcus OS</span>
           </div>
         )}
         <button onClick={() => setCollapsed(!collapsed)} aria-label="Collapse sidebar" className="w-8 h-8 rounded-xl flex items-center justify-center text-[#6b7280] hover:bg-white/80 transition">
@@ -68,14 +82,15 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       <div className="flex-1 py-3 overflow-y-auto no-scrollbar">
         {sections.map((s) => (
           <div key={s.title} className="mb-3">
-            {!collapsed && <p className="px-6 pb-1.5 pt-2 text-[11px] font-medium uppercase tracking-wider text-[#9ca3af]">{s.title}</p>}
-            <nav className="flex flex-col gap-0.5 px-3">
+            {!collapsed && <button onClick={()=>toggleSection(s.title)} aria-expanded={!closed[s.title]} className="w-full flex items-center justify-between px-6 pb-1.5 pt-2 text-[11px] font-medium uppercase tracking-wider text-[#9ca3af]">{s.title}<ChevronDown size={13} className={closed[s.title]?"-rotate-90":""}/></button>}
+            {(collapsed || !closed[s.title]) && <nav className="flex flex-col gap-0.5 px-3">
               {s.items.map((i) => (
                 <Item key={i.href} item={i} collapsed={collapsed} />
               ))}
-            </nav>
+            </nav>}
           </div>
         ))}
+        {!collapsed && <details className="mx-3 mt-3"><summary className="text-[11px] uppercase tracking-wider text-[var(--text-muted)] cursor-pointer px-3 py-2">Recent chats</summary><nav className="space-y-1">{history?.threads.map(thread=><Link href={`/chat?t=${encodeURIComponent(thread.id)}`} key={thread.id} className="block truncate rounded-xl px-3 py-2 text-xs hover:bg-white">{thread.title}</Link>)}{!history?.threads.length&&<p className="text-xs text-[var(--text-muted)] px-3 py-2">No conversations yet.</p>}</nav></details>}
       </div>
       <div className="p-3 border-t border-[#e8eaee]/80">
         <Item item={settingsItem} collapsed={collapsed} />

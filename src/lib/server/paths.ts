@@ -6,7 +6,7 @@ const home = os.homedir();
 // Every path has a default for Marcus's Mac and can be overridden in .env.local.
 export const paths = {
   hermesBin: process.env.HERMES_BIN || path.join(home, ".local/bin/hermes"),
-  hermesHome: path.join(home, ".hermes"),
+  hermesHome: process.env.HERMES_HOME || path.join(home, ".hermes"),
   board: process.env.HERMES_BOARD || "command-center",
   agentsDir: process.env.LAZY_MONEY_AGENTS_DIR || path.join(home, "Desktop/LAZY MONEY AGENTS"),
   crmDir: process.env.CRM_DIR || path.join(home, "Desktop/Content and Outreach App/app"),

@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- slide previews are blob and API URLs that next/image cannot optimize */
 
+import { PostOptions, defaultPostOptions, sendableOptions } from "@/components/social/PostOptions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, ArrowDown, Copy, Trash2, RefreshCw, Plus, Loader2, CheckCircle2, XCircle, Download, Send, CalendarClock } from "lucide-react";
 import { api, useApi } from "@/lib/client";
@@ -10,6 +11,9 @@ import { templateById } from "@/lib/carousel/templates";
 import { runChecks } from "@/lib/carousel/checks";
 import { DEFAULT_BANNED } from "@/lib/carousel/banned";
 import { ImagePanel } from "./ImagePanel";
+import { CoverPanel } from "./CoverPanel";
+import { screenshotLayout, screenshotWantsImage } from "@/lib/carousel/screenshot";
+import { Segmented } from "@/components/ui";
 import type { Step } from "./useCarousel";
 
 const Spin = () => <Loader2 size={14} className="animate-spin" />;
@@ -53,7 +57,7 @@ function useSlideRenders(car: Carousel) {
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [flags, setFlags] = useState<string[]>([]);
   const urls = useRef<string[]>([]);
-  const key = JSON.stringify([car.slides, car.template, car.mode, car.size, car.theme, car.useBrandColors, car.clone.spec, car.inputs.badge]);
+  const key = JSON.stringify([car.cover, car.slides, car.template, car.mode, car.size, car.theme, car.useBrandColors, car.clone.spec, car.inputs.badge]);
   useEffect(() => {
     let alive = true;
     const t = setTimeout(async () => {
@@ -77,12 +81,13 @@ function useSlideRenders(car: Carousel) {
   return { thumbs, flags };
 }
 
-export function ReviewStep({ car, busy, update, updateSlide, generate, replace, index, setIndex, onRunsOff, onNext }: Common & { index: number; setIndex: (n: number) => void; onRunsOff: () => void; onNext: () => void }) {
+export function ReviewStep({ car, busy, update, updateSlide, generate, replace, flush, index, setIndex, onRunsOff, onNext }: Common & { index: number; setIndex: (n: number) => void; onRunsOff: () => void; onNext: () => void }) {
   const { thumbs, flags } = useSlideRenders(car);
   const banned = useApi<{ banned: string[] }>("/api/social/banned");
   const checks = useMemo(() => runChecks(car, banned.data?.banned ?? DEFAULT_BANNED, flags), [car, banned.data, flags]);
   const slide = car.slides[index];
   const layouts = templateById(car.template).layouts;
+  const textFit = car.mode === "screenshot" && slide ? screenshotLayout(car, slide, !!slide.images[0]) : null;
   const move = (from: number, to: number) => {
     if (to < 0 || to >= car.slides.length) return;
     update((c) => { const s = [...c.slides]; const [x] = s.splice(from, 1); s.splice(to, 0, x); return { slides: s }; });
@@ -105,6 +110,10 @@ export function ReviewStep({ car, busy, update, updateSlide, generate, replace, 
         {car.slides.length < 10 && <button onClick={add} aria-label="Add slide" className={cx("shrink-0 w-20 rounded-xl border border-dashed border-[#d1d5db] flex items-center justify-center text-[#9ca3af]", car.size === "4:5" ? "aspect-[4/5]" : "aspect-[3/4]")}><Plus size={18} /></button>}
       </div>
 
+      {index === 0 && <CoverPanel car={car} update={update} flush={flush} onRunsOff={onRunsOff} />}
+      {car.mode === "screenshot" && <div className="mb-4"><p className="text-xs font-medium text-[#6b7280] mb-2">Screenshot template for inner slides</p><Segmented value={screenshotWantsImage(car) ? "screenshot-image" : "screenshot"} onChange={(template) => update({ template, inputs: { ...car.inputs, includeImages: template === "screenshot-image" } })} options={[{ id: "screenshot", label: "Text only" }, { id: "screenshot-image", label: "Text + image" }]} /></div>}
+      {index === 0 && car.cover && <p className="text-xs text-[#6b7280] mb-3">Your finished artwork is used for this cover. The text below stays available for captions and future template covers.</p>}
+      {textFit && !(index === 0 && car.cover) && <p className={cx("text-xs mb-3", textFit.fits ? "text-[#6b7280]" : "text-[#b91c1c]")}>Auto-fit: {textFit.px}px. More copy makes the text smaller, down to 36px. {textFit.fits ? "An image leaves less room for text." : "This copy is still too long. Shorten it or add another slide."}</p>}
       {slide && (
         <div className="rounded-2xl border border-[#e8eaee] p-3 mb-4">
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
@@ -137,7 +146,7 @@ export function ReviewStep({ car, busy, update, updateSlide, generate, replace, 
             <Field label={`Photo dimming ${slide.dim}`}><input type="range" min={0} max={90} step={1} value={slide.dim} onChange={(e) => updateSlide(index, { dim: Number(e.target.value) })} className="w-full accent-[#1a1d24]" /></Field>
           </div>
           <label className="flex items-center gap-2 text-sm mb-3"><input type="checkbox" className="accent-[#1a1d24]" checked={slide.showHandle} onChange={(e) => updateSlide(index, { showHandle: e.target.checked })} /> Show my handle</label>
-          {(car.inputs.includeImages || car.mode === "photo" || car.mode === "editorial" || templateById(car.template).style?.image !== "none") && (
+          {(car.mode === "screenshot" ? screenshotWantsImage(car) : car.inputs.includeImages || car.mode === "photo" || car.mode === "editorial" || templateById(car.template).style?.image !== "none") && !(index === 0 && car.cover) && (
             <ImagePanel car={car} index={index} onRunsOff={onRunsOff} onCarousel={replace}
               onSet={(slot, file) => updateSlide(index, { images: (() => { const im = [...slide.images]; im[slot] = file ?? ""; while (im.length && !im[im.length - 1]) im.pop(); return im; })() })} />
           )}
@@ -177,8 +186,11 @@ export function PostStep({ car, busy, update, generate, replace, flush }: Common
   const checks = useMemo(() => runChecks(car, banned.data?.banned ?? DEFAULT_BANNED, []), [car, banned.data]);
   const failing = checks.filter((c) => !c.ok);
   const [picked, setPicked] = useState<string[]>([]);
-  const [when, setWhen] = useState("");
+  // Planned calendar posts start at 9 AM on their planned day.
+  const [when, setWhen] = useState(car.planDate ? `${car.planDate}T09:00` : "");
   const [reason, setReason] = useState("");
+  const [opts, setOpts] = useState(defaultPostOptions);
+  const [repeat, setRepeat] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const mine = (posts.data?.records ?? []).filter((r) => r.carouselId === car.id).sort((a, b) => b.when.localeCompare(a.when));
@@ -188,9 +200,12 @@ export function PostStep({ car, busy, update, generate, replace, flush }: Common
     setSending(true); setErr(null);
     try {
       await flush();
-      const r = await api<{ record: Record_; carousel: Carousel }>(`/api/social/carousels/${car.id}/post`, { method: "POST", json: { channelIds: picked, now, when: now ? "" : new Date(when).toISOString(), caption: car.caption, overrideReason: failing.length ? reason : undefined } });
+      const post = (at: string, isNow: boolean) => api<{ record: Record_; carousel: Carousel }>(`/api/social/carousels/${car.id}/post`, { method: "POST", json: { channelIds: picked, now: isNow, when: isNow ? "" : new Date(at).toISOString(), caption: car.caption, overrideReason: failing.length ? reason : undefined, options: sendableOptions(opts) } });
+      let r = await post(when, now);
       replace(r.carousel);
       if (r.record.state !== "scheduled") setErr(r.record.error);
+      // "Post it again" sends a second, separate schedule once the first is confirmed.
+      else if (repeat && !opts.draft) { r = await post(repeat, false); replace(r.carousel); if (r.record.state !== "scheduled") setErr(`First post is scheduled. The second one did not go through: ${r.record.error ?? r.record.state}`); else setRepeat(""); }
       await posts.reload();
     } catch (e) { setErr((e as Error).message); } finally { setSending(false); }
   };
@@ -223,6 +238,8 @@ export function PostStep({ car, busy, update, generate, replace, flush }: Common
         <input type="datetime-local" className={inputCls} value={when} onChange={(e) => setWhen(e.target.value)} />
       </Field>
 
+      <PostOptions value={opts} onChange={setOpts} networks={(ch.data?.channels ?? []).filter((c) => picked.includes(c.id)).map((c) => c.identifier)} video={false} repeat={repeat} onRepeat={setRepeat} />
+
       {failing.length > 0 && (
         <Field label={`${failing.length} quality check${failing.length > 1 ? "s" : ""} failing. Why post anyway?`} hint="Saved with the post. Or go back to Review and fix them.">
           <input className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Testing a new format" />
@@ -238,8 +255,8 @@ export function PostStep({ car, busy, update, generate, replace, flush }: Common
         </div>
       ) : (
         <div className="flex gap-2 flex-wrap mb-3">
-          <Button disabled={!canSend || !when} onClick={() => void send(false)}>{sending ? <Spin /> : <CalendarClock size={14} />} Schedule</Button>
-          <Button variant="light" disabled={!canSend} onClick={() => void send(true)}><Send size={14} /> Post now</Button>
+          <Button disabled={!canSend || !when} onClick={() => void send(false)}>{sending ? <Spin /> : <CalendarClock size={14} />} {opts.draft ? "Save draft in Postiz" : "Schedule"}</Button>
+          {!opts.draft && <Button variant="light" disabled={!canSend} onClick={() => void send(true)}><Send size={14} /> Post now</Button>}
           <a href={`/api/social/carousels/${car.id}/zip`} className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-2xl text-sm font-medium bg-white border border-[#e8eaee]"><Download size={14} /> Download PNGs</a>
         </div>
       )}

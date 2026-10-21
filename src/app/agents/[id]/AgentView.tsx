@@ -4,7 +4,8 @@ import Link from "next/link";
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Crown, MessageSquare, Loader2 } from "lucide-react";
-import { api, useApi } from "@/lib/client";
+import { api, timeAgo, useApi } from "@/lib/client";
+import { AgentEditor } from "@/components/agents/AgentEditor";
 import { Avatar, Badge, Button, Card, ErrorNote, Page } from "@/components/ui";
 
 type Agent = {
@@ -26,12 +27,13 @@ type Agent = {
   liveModel: string | null;
   gateway: string | null;
   installed: boolean;
+  health: { ok: boolean; checkedAt: number; reason: string } | null;
 };
 
 export function AgentView({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { data, error } = useApi<{ agent: Agent; soul: string; roleGuide: string; extraSkills: string[] }>(`/api/agents/${id}`);
+  const { data, error, reload } = useApi<{ agent: Agent; soul: string; roleGuide: string; extraSkills: string[] }>(`/api/agents/${id}`);
   const [busy, setBusy] = useState(false);
   const a = data?.agent;
 
@@ -64,7 +66,8 @@ export function AgentView({ params }: { params: Promise<{ id: string }> }) {
               <p className="text-sm text-[#6b7280] mt-1 leading-relaxed">{a.description}</p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 <Badge tone={a.gateway === "running" ? "green" : "gray"}>{a.gateway === "running" ? "Online" : "Offline"}</Badge>
-                <Badge>Hermes id: {a.id}</Badge>
+                {a.health && <Badge tone={a.health.ok ? "green" : "red"}>{a.health.ok ? `Reply verified ${timeAgo(a.health.checkedAt)}` : a.health.reason}</Badge>}
+                <Badge>Agent id: {a.id}</Badge>
                 {a.liveModel && <Badge tone="blue">{a.liveModel}</Badge>}
                 <Badge>{a.isHead ? "Head agent" : `Reports to ${a.reportsTo === "jordan" ? "Jordan" : a.reportsTo}`}</Badge>
               </div>
@@ -136,6 +139,8 @@ export function AgentView({ params }: { params: Promise<{ id: string }> }) {
               </Card>
             )}
           </div>
+
+          <AgentEditor id={id} onSaved={reload} />
 
           {data?.soul && (
             <Card className="p-5 mt-4">

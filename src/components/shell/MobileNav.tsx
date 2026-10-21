@@ -21,8 +21,8 @@ export function MobileNav({ onSearch }: { onSearch: () => void }) {
       <header className="md:hidden fixed top-0 inset-x-0 z-40 bg-white/85 backdrop-blur-xl border-b border-[#e8eaee]" style={{ paddingTop: "var(--safe-t)" }}>
         <div className="h-14 flex items-center justify-between px-4">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-[#1a1d24] text-white text-xs font-semibold flex items-center justify-center shrink-0">H</div>
-            <span className="font-semibold text-[15px] truncate">{current?.label ?? "Hermes"}</span>
+            <div className="w-7 h-7 rounded-lg bg-[#1a1d24] text-white text-xs font-semibold flex items-center justify-center shrink-0">M</div>
+            <span className="font-semibold text-[15px] truncate">{current?.label ?? "Marcus OS"}</span>
           </div>
           <button onClick={onSearch} aria-label="Search" className="w-11 h-11 -mr-2 rounded-xl flex items-center justify-center text-[#1a1d24]">
             <Search size={20} />

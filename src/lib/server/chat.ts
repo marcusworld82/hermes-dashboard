@@ -1,8 +1,8 @@
-import { readJson, updateJson, newId, now } from "./store";
-import { getSettings, requireRuns } from "./settings";
-import { askProfile } from "./hermes";
-import { getAgents } from "./agents";
-import { sendToBridge } from "./models";
+import { readJson, updateJson, newId, now } from "./store.ts";
+import { getSettings, requireRuns } from "./settings.ts";
+import { askProfile } from "./hermes.ts";
+import { getAgents } from "./agents.ts";
+import { sendToBridge } from "./models.ts";
 
 // Three ways to talk: one agent, a group of agents, or a model directly.
 // The head agent (the Operator) is the default target.
@@ -78,9 +78,18 @@ function withHistory(t: Thread, text: string, extra = "") {
   return [extra, past ? `Conversation so far:\n${past}\n` : "", `Marcus: ${text}`].filter(Boolean).join("\n\n");
 }
 
+const sending = new Set<string>();
+
 export async function send(threadId: string, text: string) {
+  if (sending.has(threadId)) throw new Error("This conversation already has a reply in progress.");
+  sending.add(threadId);
+  try { return await sendMessage(threadId, text); } finally { sending.delete(threadId); }
+}
+
+async function sendMessage(threadId: string, text: string) {
   const body = text.trim();
   if (!body) throw new Error("Type a message first.");
+  if (body.length > 50_000) throw new Error("Keep messages under 50,000 characters.");
   const thread = getThread(threadId);
   const user: Message = { id: newId("m"), role: "user", author: "marcus", text: body, at: now() };
   const title = body.length > 48 ? `${body.slice(0, 45)}...` : body;

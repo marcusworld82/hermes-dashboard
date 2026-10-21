@@ -9,6 +9,7 @@ import type { Carousel, Mode } from "@/lib/carousel/types";
 import { defaultTemplate } from "@/lib/carousel/templates";
 import { useCarousel } from "@/components/social/useCarousel";
 import { Preview } from "@/components/social/Preview";
+import { StyleGallery } from "@/components/social/StyleGallery";
 import { TopicStep, MODES } from "@/components/social/TopicStep";
 import { HookStep, ReviewStep, PostStep } from "@/components/social/ReviewPost";
 
@@ -66,10 +67,10 @@ function Start() {
   const list = useApi<{ carousels: Carousel[] }>("/api/social/carousels");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const create = async (mode: Mode) => {
+  const create = async (mode: Mode, template = defaultTemplate(mode)) => {
     setBusy(true); setErr(null);
     try {
-      const r = await api<{ carousel: Carousel }>("/api/social/carousels", { method: "POST", json: { mode, template: defaultTemplate(mode) } });
+      const r = await api<{ carousel: Carousel }>("/api/social/carousels", { method: "POST", json: { mode, template } });
       router.push(`/social/carousels?id=${r.carousel.id}`);
     } catch (e) { setErr((e as Error).message); setBusy(false); }
   };
@@ -84,6 +85,7 @@ function Start() {
           {MODES.map((m) => <Button key={m.id} variant="light" disabled={busy} onClick={() => void create(m.id)}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {m.label}</Button>)}
         </div>
       </Card>
+      <StyleGallery busy={busy} onChoose={(mode, template) => void create(mode, template)} />
       {drafts.length > 0 && (
         <>
           <p className="text-sm font-medium mb-2">Keep working on</p>
