@@ -57,3 +57,13 @@ Both open from the dashboard sidebar on your Mac and have a Start button. Recast
 ## 9. Workflow schedules
 
 Workflows save a "when it runs" note. Automatic scheduling is not switched on yet. Ask Claude to wire it to `hermes cron` once agent runs are on.
+
+## Lead Research
+
+- [x] Verify Hermes's Notion connection can read the Companies, People, Opportunities, Evidence and Run Log data sources. Verified October 20, 2026; all five were empty.
+- [ ] If access changes, share the Lead Research parent page with Hermes's Notion connection and click Refresh Notion.
+- [ ] Supply `APIFY_TOKEN` in `.env.local` before approved paid discovery. Reading the list does not need this token.
+- [ ] Supply `NOTION_TOKEN` only if using the separate direct REST sync path, and share the page with that integration. The Hermes MCP reader does not need it.
+- [ ] After the final build and restart, check `/lead-research` at desktop and phone widths. Confirm empty/error states and linked source details.
+
+Last successful data and the last refresh attempt are stored separately in `data/lead-research-live.json`. A failed read preserves the prior complete snapshot and delays the next automatic attempt for 30 minutes. A manual Refresh Notion click bypasses the delay.

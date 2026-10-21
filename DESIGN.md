@@ -1,21 +1,23 @@
-# Hermes Dashboard — Design System
+# Marcus OS Design System
 
-Light-only visual system inspired by Juice Lab’s soft SaaS dashboards.
+Marcus supplied the cream and red portfolio reference on October 20, 2026. This replaces the earlier dark purple direction. Reuse existing components and dashboard layouts.
 
 ## Palette
-- Background: pearl `#f7f6f4` with soft radial sheen (white / warm / cool overlays)
-- Surface: `#ffffff`
-- Surface soft: `#fcfcfd`
-- Border: `#e8eaee`
-- Text: `#1a1d24`
-- Text muted: `#6b7280`
-- Text soft: `#9ca3af`
-- Accent (buttons, active nav): `#1a1d24`
-- Green: `#10b981` / soft `#d1fae5`
-- Red: `#ef4444` / soft `#fee2e2`
-- Blue: `#3b82f6` / soft `#dbeafe`
-- Purple: `#8b5cf6` / soft `#ede9fe`
-- Amber: `#f59e0b`
+- Background: `#faf7f2`, warm cream with a faint blush wash
+- Cards: `#fffefd`
+- Recessed surfaces: `#f5efea`
+- Border: `#e8ded8`
+- Main text: `#201b19`
+- Secondary text: `#6e625c`
+- Quiet text: `#796b64`
+- Primary buttons and active navigation: `#e81725` with white text
+- Selected soft backgrounds: `#fde8e7`
+- Success: `#176b4c` on `#e7f4ec`
+- Warning: `#8b570f` on `#fff3d9`
+- Error: `#b91c2b` on `#fce7e7`
+- Information: `#2358a5` on `#eaf1fb`
+
+Color supports labels and never carries status alone. Primary controls use red; danger controls use a pale error surface with explicit labels. Keep blush glows outside text-heavy cards. No new UI framework or decorative portfolio sections.
 
 ## Typography
 - Family: Outfit (Google Fonts)
