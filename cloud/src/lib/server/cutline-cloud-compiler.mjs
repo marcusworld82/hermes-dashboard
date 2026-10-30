@@ -4,7 +4,7 @@ import { CutlineError, validateBundle } from './cutline-cloud-core.mjs';
 const fail = message => { throw new CutlineError('INVALID_DOCUMENT', message); };
 const SFX = { whip: 'whoosh-heavy.mp3', zoompunch: 'whoosh.mp3', spin: 'whoosh.mp3', flash: 'click.wav', glitch: 'click.wav', shake: 'click.wav' };
 const safeJSON = doc => JSON.stringify(doc).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-function validateDoc(doc, availableFonts) {
+export function validateCutlineDocument(doc, availableFonts) {
   let nodes = 0;
   function visit(value, key = '', depth = 0) {
     if (++nodes > 100000 || depth > 16) fail('Document complexity limit exceeded.');
@@ -14,7 +14,7 @@ function validateDoc(doc, availableFonts) {
       // Text is rendered using textContent by the unchanged engine; all other
       // strings are style/token values and cannot contain CSS/URL syntax.
       if (key !== 'text' && /[<>;{}\\]|url\s*\(|expression\s*\(|https?:|data:|javascript:/i.test(value)) fail('Unsafe style or URL value.');
-      if (key === 'font' && !availableFonts.has(value)) fail('Font is not in the approved render bundle.');
+      if (key === 'font' && availableFonts && !availableFonts.has(value)) fail('Font is not in the approved render bundle.');
     }
     if (value && typeof value === 'object') {
       if (Array.isArray(value) && value.length > 10000) fail('Array limit exceeded.');
@@ -27,11 +27,11 @@ function validateDoc(doc, availableFonts) {
   if (!(duration > 0 && duration <= 120) || !Number.isInteger(w) || !Number.isInteger(h) || w < 16 || h < 16 || w > 1920 || h > 1920 || w % 2 || h % 2) fail('Maximum render is two minutes at 1920 pixels per side.');
   const wordIds = new Set();
   for (const word of doc.words) {
-    if (typeof word.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(word.id) || wordIds.has(word.id) || typeof word.text !== 'string' || !(word.start >= 0 && word.end >= word.start && word.end <= duration)) fail('Invalid word timing or identifier.');
+    if (typeof word.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(word.id) || wordIds.has(word.id) || ['__proto__', 'constructor', 'prototype'].includes(word.id) || typeof word.text !== 'string' || !(word.start >= 0 && word.end >= word.start && word.end <= duration)) fail('Invalid word timing or identifier.');
     wordIds.add(word.id);
   }
   if (doc.captions.length > 2000) fail('Too many captions.');
-  for (const cap of doc.captions) if (!Array.isArray(cap.wordIds) || !cap.wordIds.length || cap.wordIds.length > 100 || !cap.wordIds.every(id => wordIds.has(id))) fail('Invalid caption words.');
+  for (const cap of doc.captions) if (typeof cap.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(cap.id) || ['__proto__','constructor','prototype'].includes(cap.id) || !Array.isArray(cap.wordIds) || !cap.wordIds.length || cap.wordIds.length > 100 || !cap.wordIds.every(id => wordIds.has(id))) fail('Invalid caption words.');
   for (const transition of doc.transitions || []) if (!(typeof transition.t === 'number' && transition.t >= 0 && transition.t <= duration) || (transition.dur !== undefined && !(transition.dur >= 0 && transition.dur <= 10))) fail('Invalid transition timing.');
   return doc;
 }
@@ -46,7 +46,7 @@ export function createCutlineCompiler({ engine, engineDigest, gsap, fonts = [], 
   const context = vm.createContext({}); vm.runInContext(engine.toString('utf8'), context, { timeout: 1000 });
   return {
     compile(document, source) {
-      const doc = validateDoc(structuredClone(document), names);
+      const doc = validateCutlineDocument(structuredClone(document), names);
       if (!Buffer.isBuffer(source) || !source.length) fail('Owned source media is required.');
       // JSON boundary prevents cross-realm prototypes; only pure engine timing runs.
       context.__doc = JSON.parse(JSON.stringify(doc));

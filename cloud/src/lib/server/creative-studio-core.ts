@@ -3,8 +3,9 @@ import { createHash, randomUUID } from "node:crypto";
 export type Payload = Record<string, unknown>;
 export type JobStatus = "submitting" | "uncertain" | "queued" | "in_progress" | "persisting" | "completed" | "failed" | "nsfw" | "canceled";
 export type SavedOutput = { key: string; contentType: string; bytes: number; width?: number; height?: number };
-export type StudioJob = { id: string; idempotencyKey: string; quoteId: string; fingerprint: string; model: string; payload: Payload; usd: number; month: string; status: JobStatus; createdAt: number; updatedAt: number; requestId?: string; statusUrl?: string; outputs?: SavedOutput[]; error?: string; nextPollAt?: number; pollDelayMs?: number; redoOf?: string };
-export type StudioQuote = { id: string; model: string; payload: Payload; fingerprint: string; usd: number; expiresAt: number; usedBy?: string };
+export type StudioSource = {jobId:string;outputIndex:number;sha256:string;aspectRatio:string;width:number;height:number;expiresAt:number};
+export type StudioJob = { id: string; idempotencyKey: string; quoteId: string; fingerprint: string; intentFingerprint?: string; model: string; payload: Payload; usd: number; month: string; status: JobStatus; createdAt: number; updatedAt: number; requestId?: string; statusUrl?: string; outputs?: SavedOutput[]; error?: string; nextPollAt?: number; pollDelayMs?: number; redoOf?: string; source?: StudioSource; caption?: string };
+export type StudioQuote = { id: string; model: string; payload: Payload; fingerprint: string; intentFingerprint?: string; usd: number; expiresAt: number; usedBy?: string; source?: StudioSource; caption?: string };
 export type StudioState = { jobs: StudioJob[]; quotes: StudioQuote[] };
 /** Must atomically commit the mutation before resolving, across processes/restarts.
  * A thrown callback must roll back completely. Return detached values to callers.
@@ -12,9 +13,9 @@ export type StudioState = { jobs: StudioJob[]; quotes: StudioQuote[] };
 export interface StudioStore { durable: boolean; transaction<T>(mutate: (state: StudioState) => T): Promise<T>; read(): Promise<StudioState>; saveOutputs(jobId: string, outputs: unknown, payload: Payload): Promise<SavedOutput[]> }
 export interface StudioProvider { estimate(model: string, payload: Payload): Promise<unknown>; submit(model: string, payload: Payload, idempotencyKey: string): Promise<{ request_id: string; status_url: string }>; poll(statusUrl: string): Promise<{ status: string; outputs?: unknown }> }
 /** Installed by owner code only, after checking the model's current official schema. */
-export interface StudioModel { id: string; endpoint: string; source: string; verifiedAt: string; validate(payload: Payload): boolean }
+export interface StudioModel { id: string; endpoint: string; source: string; verifiedAt: string; requiresSource?: boolean; validate(payload: Payload): boolean }
 export class StudioError extends Error { code: string; status: number; constructor(code: string, message: string, status = 409) { super(message); this.code = code; this.status = status; } }
-const terminalFailure = (s: JobStatus) => ["failed", "nsfw", "canceled"].includes(s);
+const redoAllowed = (s: JobStatus) => ["completed", "failed", "nsfw", "canceled"].includes(s);
 const active = (s: JobStatus) => !["completed", "failed", "nsfw", "canceled"].includes(s);
 function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -28,17 +29,23 @@ export class CreativeStudio {
   constructor(store: StudioStore, provider: StudioProvider, models: StudioModel[], budgetUsd: number, now = Date.now) { this.store = store; this.provider = provider; this.models = models; this.budgetUsd = budgetUsd; this.now = now; }
   private ready() { if (!this.store.durable) throw new StudioError("STORAGE_UNAVAILABLE", "Durable Studio storage is unavailable. No generation was submitted.", 503); if (!Number.isFinite(this.budgetUsd) || this.budgetUsd <= 0) throw new StudioError("BUDGET_UNAVAILABLE", "Set a monthly Studio budget first.", 503); }
   private model(id: string, payload: Payload) { const m = this.models.find(x => x.id === id); if (!m || !m.source.startsWith("https://") || !Number.isFinite(Date.parse(m.verifiedAt)) || !m.validate(payload)) throw new StudioError("INVALID_MODEL_INPUT", "Use an installed model profile and its verified input schema.", 400); return m; }
-  async quote(model: string, payload: Payload) {
+  async quote(model: string, payload: Payload, options: {source?:StudioSource;caption?:string} = {}) {
     this.ready(); const profile = this.model(model, payload);
+    if(profile.requiresSource && !options.source)throw new StudioError("SOURCE_REQUIRED","Choose a saved normalized Studio image for this model.",400);
+    if(options.caption!==undefined && (typeof options.caption!=="string" || options.caption.length>4000))throw new StudioError("INVALID_CAPTION","Caption must be at most 4,000 characters.",400);
     // Snapshot before estimate: caller mutations cannot change the paid payload.
     const body = JSON.parse(JSON.stringify(payload)) as Payload;
     const fp = fingerprint(`${model}:${profile.endpoint}`, body), now = this.now();
-    const cached = (await this.store.read()).quotes.find(q => q.fingerprint === fp && q.expiresAt > now && !q.usedBy);
+    // Source delivery tokens rotate. Bind duplicate protection to the immutable
+    // saved artifact and motion settings so a refreshed URL cannot bypass uncertainty.
+    const intentFingerprint = options.source ? fingerprint(`${model}:${profile.endpoint}`, {...body,image_url:`saved:${options.source.jobId}:${options.source.outputIndex}:${options.source.sha256}`}) : fp;
+    const cached = (await this.store.read()).quotes.find(q => q.fingerprint === fp && q.expiresAt > now && !q.usedBy && q.caption === options.caption);
     if (cached) return structuredClone(cached);
     const estimate = await this.provider.estimate(model, body);
     const usd = (estimate as { usd?: unknown } | null)?.usd;
     if (typeof usd !== "number" || !Number.isFinite(usd) || usd < 0) throw new StudioError("PRICE_UNKNOWN", "Higgsfield did not return a numeric USD estimate. Paid submission is disabled.", 422);
-    const q: StudioQuote = { id: randomUUID(), model, payload: body, fingerprint: fp, usd, expiresAt: now + 600_000 };
+    const q: StudioQuote = { id: randomUUID(), model, payload: body, fingerprint: fp, intentFingerprint, usd, expiresAt: Math.min(now + 600_000, options.source ? options.source.expiresAt - 120_000 : Infinity), ...(options.source?{source:structuredClone(options.source)}:{}), ...(options.caption!==undefined?{caption:options.caption}:{}) };
+    if(q.expiresAt<=now)throw new StudioError("SOURCE_EXPIRED","Refresh the saved image estimate before generating.");
     await this.store.transaction(state => { state.quotes = state.quotes.filter(q => q.expiresAt > now); state.quotes.push(q); });
     return structuredClone(q);
   }
@@ -52,15 +59,16 @@ export class CreativeStudio {
       const q = state.quotes.find(q => q.id === input.quoteId);
       if (!q || q.expiresAt <= now || q.usedBy) throw new StudioError("QUOTE_EXPIRED", "Get a fresh estimate before generating.");
       const profile = this.model(q.model, q.payload);
+      if(profile.requiresSource && (!q.source || q.source.expiresAt<=now+120_000 || !state.jobs.some(j=>j.id===q.source?.jobId && j.status==="completed" && j.outputs?.[q.source.outputIndex]?.key===`hermes/creative-studio/v1/outputs/${q.source.jobId}/${q.source.sha256}`)))throw new StudioError("SOURCE_EXPIRED","The saved source is missing or its delivery link expired. Get a fresh estimate.");
       if (q.fingerprint !== fingerprint(`${q.model}:${profile.endpoint}`, q.payload)) throw new StudioError("MODEL_PROFILE_CHANGED", "The model endpoint changed after this estimate. Get a fresh estimate.");
-      if (state.jobs.some(j => j.fingerprint === q.fingerprint && active(j.status))) throw new StudioError("REQUEST_UNRESOLVED", "This exact request is already active or uncertain. Resolve it before submitting again.");
+      if (state.jobs.some(j => (j.intentFingerprint??j.fingerprint) === (q.intentFingerprint??q.fingerprint) && active(j.status))) throw new StudioError("REQUEST_UNRESOLVED", "This exact request is already active or uncertain. Resolve it before submitting again.");
       if (q.usd > 1 && !input.confirmOverDollar) throw new StudioError("CONFIRM_PRICE", "Confirm this estimate over $1 before generating.");
-      if (input.redoOf && !state.jobs.some(j => j.id === input.redoOf && terminalFailure(j.status))) throw new StudioError("REDO_BLOCKED", "Redo is available only after terminal failure. Check unresolved requests first.");
+      if (input.redoOf && !state.jobs.some(j => j.id === input.redoOf && redoAllowed(j.status))) throw new StudioError("REDO_BLOCKED", "Redo requires a completed or terminally failed job. Check unresolved requests first.");
       if (state.jobs.filter(j => active(j.status)).length >= 3) throw new StudioError("QUEUE_FULL", "Three jobs are already active. Wait for a job to finish.");
       // Estimates are retained conservatively even on failure; only provider billing reconciliation can release them.
       const reserved = state.jobs.filter(j => j.month === month).reduce((sum, j) => sum + j.usd, 0);
       if (reserved + q.usd >= this.budgetUsd && !input.confirmBudget) throw new StudioError("CONFIRM_BUDGET", "This request reaches your monthly estimated budget. Explicit confirmation is required.");
-      const job: StudioJob = { id: randomUUID(), idempotencyKey: input.idempotencyKey, quoteId: q.id, fingerprint: q.fingerprint, model: q.model, payload: structuredClone(q.payload), usd: q.usd, month, status: "submitting", createdAt: now, updatedAt: now, ...(input.redoOf ? { redoOf: input.redoOf } : {}) };
+      const job: StudioJob = { id: randomUUID(), idempotencyKey: input.idempotencyKey, quoteId: q.id, fingerprint: q.fingerprint, intentFingerprint:q.intentFingerprint??q.fingerprint, model: q.model, payload: structuredClone(q.payload), usd: q.usd, month, status: "submitting", createdAt: now, updatedAt: now, ...(input.redoOf ? { redoOf: input.redoOf } : {}), ...(q.source?{source:structuredClone(q.source)}:{}), ...(q.caption!==undefined?{caption:q.caption}:{}) };
       q.usedBy = job.id; state.jobs.push(job);
       return { job: structuredClone(job), fresh: true };
     });

@@ -3,7 +3,7 @@ import { CutlineError, parseRenderRequest, readBoundedJson } from './cutline-clo
 import { cutlineCloudStatus } from './cutline-cloud-status.mjs';
 const headers = { 'Cache-Control': 'private, no-store' };
 const publicJob = job => ({ id: job.id, projectId: job.projectId, revision: job.revision, state: job.state, createdAt: job.createdAt, updatedAt: job.updatedAt, ...(job.errorCode ? { errorCode: job.errorCode } : {}), ...(job.state === 'succeeded' ? { downloadPath: `/api/cutline-cloud/jobs/${job.id}/output` } : {}) });
-function auth(request, env) {
+export function cutlineCloudOwner(request, env) {
   const token = request.headers.get('cookie')?.split(';').map(s => s.trim()).find(s => s.startsWith('hermes_session='))?.slice('hermes_session='.length) || '';
   if (!validSession(token, env.HERMES_SESSION_SECRET || '')) throw new CutlineError('UNAUTHORIZED', 'Sign in to Hermes.', 401);
   if (!['GET', 'HEAD'].includes(request.method) && !sameOrigin(request.headers.get('origin'), request.headers.get('host'))) throw new CutlineError('INVALID_ORIGIN', 'Request origin does not match.', 403);
@@ -13,7 +13,7 @@ function auth(request, env) {
 export function createCutlineHTTP({ env = process.env, loadRuntime, status = async () => cutlineCloudStatus(env) }) {
   return async function handle(request, action, jobId) {
     try {
-      const owner = auth(request, env);
+      const owner = cutlineCloudOwner(request, env);
       if (action === 'status') return Response.json(await status(), { headers });
       if (jobId !== undefined && !/^[a-zA-Z0-9_-]{1,64}$/.test(jobId)) throw new CutlineError('INVALID_JOB', 'Invalid job identifier.');
       let input;

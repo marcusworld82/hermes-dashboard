@@ -53,9 +53,9 @@ export function QuickChat() {
       <button
         onClick={() => setOpen(true)}
         aria-label="Quick chat with the head agent"
-        className="fixed z-40 right-4 md:right-6 bottom-[calc(var(--tabbar-h)+var(--safe-b)+14px)] md:bottom-6 h-12 pl-4 pr-5 rounded-full bg-[#1a1d24] text-white shadow-xl flex items-center gap-2 text-sm font-medium active:scale-95 transition"
+        className="fixed z-40 right-4 md:right-6 bottom-[calc(var(--tabbar-h)+var(--safe-b)+14px)] md:bottom-6 h-12 w-12 justify-center p-0 md:w-auto md:pl-4 md:pr-5 rounded-full bg-[#1a1d24] text-white shadow-xl flex items-center gap-2 text-sm font-medium active:scale-95 transition"
       >
-        <MessageCircle size={18} /> Ask {headShort}
+        <MessageCircle size={18} /><span className="hidden md:inline">Ask {headShort}</span>
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title={`Quick chat with ${head}`}>
         <div className="-mx-5 -my-4 h-[70dvh] md:h-[calc(100dvh-110px)]">

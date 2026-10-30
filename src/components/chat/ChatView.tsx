@@ -1,5 +1,6 @@
 "use client";
 
+import {BriefIdeas} from "@/components/BriefIdeas";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUp, Loader2 } from "lucide-react";
@@ -48,7 +49,7 @@ export function Composer({ onSend, busy, placeholder, autoFocus }: { onSend: (t:
     setText("");
   };
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-[#e8eaee] flex items-end gap-2 p-2">
+    <div>{!text&&<BriefIdeas label="What would you like help with?" ideas={["Help me plan the next step for a client project. Ask what you need first.","Help me turn one useful lesson into an Instagram or LinkedIn draft.","Help me review a saved opportunity and identify what evidence is missing."]} onChoose={setText}/>}<div className="bg-white rounded-3xl shadow-sm border border-[#e8eaee] flex items-end gap-2 p-2">
       <textarea
         ref={ref}
         autoFocus={autoFocus}
@@ -67,7 +68,7 @@ export function Composer({ onSend, busy, placeholder, autoFocus }: { onSend: (t:
       <button onClick={submit} disabled={!text.trim() || busy} aria-label="Send" className="w-11 h-11 rounded-2xl bg-[#1a1d24] text-white flex items-center justify-center disabled:opacity-30 active:scale-95 transition shrink-0">
         {busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowUp size={18} />}
       </button>
-    </div>
+    </div></div>
   );
 }
 

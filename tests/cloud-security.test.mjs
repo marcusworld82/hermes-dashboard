@@ -12,3 +12,5 @@ test('updated dashboard families stay allowlisted while OAuth and secret setup s
 });
 
 test('Cutline relay allows only named project media',()=>{assert.ok(safeApiPath('/api/cutline/runtime/projects/demo/assets/source.mp4'));assert.ok(safeApiPath('/api/cutline/runtime/assets/click.wav'));for(const p of ['/api/cutline/runtime/projects/demo/doc.json','/api/cutline/runtime/projects/demo/assets/key.txt','/api/cutline/runtime/assets/secret.wav'])assert.equal(safeApiPath(p),false);});
+
+test('only exact signed source GET/HEAD bypass cookie auth; route must validate HMAC',async()=>{const {studioSourceReadPath}=await import('../scripts/cloud-security.mjs');const path='/api/creative-studio/source/'+('a'.repeat(24))+'.'+('b'.repeat(43));assert.ok(studioSourceReadPath(path,'GET'));assert.ok(studioSourceReadPath(path,'HEAD'));for(const method of ['POST','PUT','DELETE','OPTIONS'])assert.equal(studioSourceReadPath(path,method),false);for(const value of [path+'/extra',path+'?token=x','/api/creative-studio/jobs','/api/creative-studio/source/short','/api/creative-studio/source/%2e%2e'])assert.equal(studioSourceReadPath(value,'GET'),false);});

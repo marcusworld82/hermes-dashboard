@@ -1,5 +1,6 @@
 "use client";
 
+import {BriefIdeas} from "@/components/BriefIdeas";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { api, useApi } from "@/lib/client";
@@ -48,7 +49,7 @@ export default function StudioPage() {
             </div>
           </div>
         ))}
-        <Field label={pick ? `Brief for: ${pick.platform} ${pick.label}` : "Pick a button first"} hint={pick?.id === "competitors" ? "List the competitor handles or names. Public posts only." : undefined}>
+        <BriefIdeas ideas={["Share one practical lesson from a recent project. Use only facts I provide.","Explain three questions a potential client should ask before using AI.","Draft a behind-the-scenes post about improving a workflow. Ask me for missing facts."]} onChoose={setBrief}/><Field label={pick ? `Brief for: ${pick.platform} ${pick.label}` : "Pick a button first"} hint={pick?.id === "competitors" ? "List the competitor handles or names. Public posts only." : undefined}>
           <textarea className={inputCls} rows={4} maxLength={4000} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="The idea, who it is for, and any link or numbers to use." />
         </Field>
         <label className="flex items-center gap-2 text-sm mb-3">

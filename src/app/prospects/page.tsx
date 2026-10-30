@@ -9,7 +9,7 @@ type Library={prospects:Prospect[];checkedAt:string;mode:string;notionUrl:string
 const stages=['To review','Contacted','Replied','Meeting','Closed','Do not contact','Needs contact','Archived','Test contact'];
 export default function Prospects(){
  const {data,error,loading,reload}=useApi<Library>('/api/connections/prospects',30000);
- const [query,setQuery]=useState(''),[selected,setSelected]=useState<string[]>([]),[openId,setOpenId]=useState<string|null>(null),[view,setView]=useState('list'),[tab,setTab]=useState('Email');
+ const [query,setQuery]=useState(''),[selected,setSelected]=useState<string[]>([]),[openId,setOpenId]=useState<string|null>(null),[view,setView]=useState('board'),[tab,setTab]=useState('Email');
  const [reply,setReply]=useState(''),[acting,setActing]=useState(false);
  const act=async(payload:Record<string,unknown>)=>{setActing(true);try{const r=await api<{message:string}>('/api/connections/prospects/outreach',{method:'POST',json:payload});setSyncMessage(r.message||'Updated');setReply('');reload();}catch(e){setSyncMessage((e as Error).message);}finally{setActing(false);}};
  const {data:health}=useApi<{checkedAt?:string;error?:string;health?:{dailyEnabled:boolean;inboxEnabled:boolean;dailyLimit:string}}>('/api/connections/prospects/outreach',30000);

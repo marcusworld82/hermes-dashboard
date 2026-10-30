@@ -1,6 +1,8 @@
 export function cutlineCloudConfig(env = process.env) {
   const positive = name => { const n = Number(env[name]); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
   return {
+    directUploads: env.CUTLINE_CLOUD_DIRECT_UPLOADS_ENABLED === 'true' && !!env.BLOB_READ_WRITE_TOKEN,
+    uploads: env.CUTLINE_CLOUD_UPLOADS_ENABLED === 'true',
     spending: env.CUTLINE_CLOUD_SPEND_ENABLED === 'true', storage: env.CUTLINE_CLOUD_STORAGE_ENABLED === 'true',
     dispatch: env.CUTLINE_CLOUD_DISPATCH_ENABLED === 'true', assetsReady: env.CUTLINE_CLOUD_ASSETS_READY === 'true',
     snapshotId: /^[a-zA-Z0-9_-]{1,128}$/.test(env.CUTLINE_CLOUD_SNAPSHOT_ID || '') ? env.CUTLINE_CLOUD_SNAPSHOT_ID : '',
@@ -22,7 +24,7 @@ export function cutlineCloudStatus(env = process.env) {
   return {
     available, provider: 'vercel-sandbox', mode: available ? 'configured' : 'blocked', code: available ? 'CONFIGURED_NOT_VERIFIED' : 'OWNER_CONFIGURATION_REQUIRED',
     message: available ? 'Cloud render configuration is present. Assets and storage are validated when used; live fidelity has not been verified.' : 'Cloud rendering is inactive. The Mac Cutline service remains available when connected.',
-    canRender: available, canUpload: false, automaticRetry: false, blockers, blockerDetails, storageHealth: 'not_checked', assetHealth: 'not_checked', liveFidelity: 'unverified',
+    canRender: available, canEdit: c.storage && c.storageCredentials, canUpload: c.storage && c.storageCredentials && c.uploads, directUploadAvailable: c.storage && c.storageCredentials && c.uploads && c.directUploads, uploadMaxBytes: c.directUploads ? 134217728 : 4194304, uploadFormats: ['video/mp4'], automaticRetry: false, blockers, blockerDetails, budget: { perJobCents: c.perJobCents || null, dailyCents: c.dailyCents || null, concurrency: c.concurrency, accounting: 'conservative-per-attempt-reservations' }, storageHealth: 'not_checked', assetHealth: 'not_checked', liveFidelity: 'unverified',
     features: {
       editorShell: 'bundled', wordEdits: 'mac-runtime', spotlight: 'mac-runtime', speakers: 'mac-runtime', keyframes: 'mac-runtime',
       motion: 'mac-runtime', transitions: 'mac-runtime', sfx: 'mac-runtime', savedStyles: 'mac-runtime', savedLayouts: 'mac-runtime',

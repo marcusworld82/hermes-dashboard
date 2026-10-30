@@ -88,6 +88,7 @@ test('compiler preserves shared engine and escapes script termination while reje
   const compiler = createCutlineCompiler({ engine, engineDigest: createHash('sha256').update(engine).digest('hex'), gsap: Buffer.from('/* trusted fixture */'), fonts: [{ family: 'Avenir Next', file: 'avenir.woff2', content: Buffer.from('licensed fixture') }] });
   const doc = { video: { duration: 2, w: 1080, h: 1920 }, settings: { transitionSound: false }, words: [{ id: 'w1', text: '</script><script>unsafe</script>', start: 0, end: 1 }], captions: [{ id: 'c1', wordIds: ['w1'], words: {} }], style: {} };
   const files = compiler.compile(doc, Buffer.from('owned fixture')); const html = files.find(f => f.rel === 'index.html').content.toString();
+  assert.equal(JSON.parse(html.match(/const DOC=([\s\S]*?);const host=/)[1]).words[0].text, doc.words[0].text);
   assert.equal(html.includes('</script><script>unsafe'), false); assert.ok(html.includes('\\u003c/script>')); assert.ok(html.includes('CaptionEngine.renderVideo')); assert.ok(files.find(f => f.rel === 'engine.js').content.equals(engine));
   assert.throws(() => compiler.compile({ ...doc, style: { font: 'Unlicensed Font' } }, Buffer.from('video')));
   assert.throws(() => compiler.compile({ ...doc, source: 'http://127.0.0.1/secrets' }, Buffer.from('video')));

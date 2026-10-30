@@ -1,6 +1,7 @@
-import { CreativeStudio, StudioError, type StudioJob } from "./creative-studio-core.ts";
+import { CreativeStudio, StudioError, type StudioJob, type StudioStore } from "./creative-studio-core.ts";
 import { STUDIO_MODELS, publicStudioModels } from "./creative-studio-models.ts";
 import { HiggsfieldStudioProvider } from "./creative-studio-provider.ts";
+import { sourceDeliveryReady } from "./creative-studio-source.ts";
 import { BlobStudioStore } from "./creative-studio-store.ts";
 /** Owner deployment setup (no secrets belong in browser config or source):
  * STUDIO_SPEND_ENABLED=true explicitly enables paid job creation. Default false.
@@ -10,6 +11,11 @@ import { BlobStudioStore } from "./creative-studio-store.ts";
  * STUDIO_MONTHLY_BUDGET_USD: positive USD estimate/reservation limit (not an invoice).
  * STUDIO_OUTPUT_HOSTS: comma-separated exact trusted provider CDN hostnames. Signed
  * output URLs are never given to browsers; media is persisted privately first.
+ * STUDIO_SOURCE_ENABLED=true plus STUDIO_SOURCE_SIGNING_SECRET (>=32 chars)
+ * explicitly enables HMAC source delivery for I2V. Both are disabled/unset by default.
+ * STUDIO_PUBLIC_BASE_URL defaults to the canonical existing Hermes deployment.
+ * Any other host must appear in owner-managed STUDIO_SOURCE_ALLOWED_HOSTS. Source
+ * tokens expire within fifteen minutes; only normalized saved PNGs can be served.
  * Defaults cover the official console media hosts; add actual generation CDN hosts
  * only after checking them. No credentials accompany CDN downloads; no redirects.
  *
@@ -30,7 +36,7 @@ export function creativeStudioStatus() {
   if (!c.storage || !c.storageCredentials) blockers.push({code:"STORAGE_UNAVAILABLE",message:"Restore the existing private Blob quota, then configure STUDIO_STORAGE_ENABLED=true with its server-side credentials. Studio does not bypass storage limits."});
   if (!Number.isFinite(c.monthlyUsd) || c.monthlyUsd<=0) blockers.push({code:"BUDGET_REQUIRED",message:"Configure a positive STUDIO_MONTHLY_BUDGET_USD before paid submissions."});
   if (!c.provider) blockers.push({code:"PROVIDER_NOT_CONNECTED",message:"Connect HF_API_KEY_ID and HF_API_KEY_SECRET in the owner deployment environment."});
-  return { enabled:blockers.length===0, provider:"higgsfield", publishingConnected:false, maxConcurrentJobs:3, quoteTtlSeconds:600, pollIntervalMs:{min:2000,max:8000}, models:publicStudioModels(), blockers, budget:{monthlyUsd:Number.isFinite(c.monthlyUsd)&&c.monthlyUsd>0?c.monthlyUsd:null,reservedUsd:null as number|null,warning:false,accounting:"unavailable"}, storageHealth:"not_checked" };
+  return { enabled:blockers.length===0, canReadJobs:c.storage&&c.storageCredentials, provider:"higgsfield", publishingConnected:false, maxConcurrentJobs:3, quoteTtlSeconds:600, pollIntervalMs:{min:2000,max:8000}, models:publicStudioModels().map(m=>({...m,...(m.requiresSource?{sourceReady:sourceDeliveryReady(),sourceBlocker:sourceDeliveryReady()?null:"Configure owner-managed expiring source delivery before making a saved image move."}:{})})), blockers, budget:{monthlyUsd:Number.isFinite(c.monthlyUsd)&&c.monthlyUsd>0?c.monthlyUsd:null,reservedUsd:null as number|null,warning:false,accounting:"unavailable"}, storageHealth:"not_checked" };
 }
 export function studioStorage() {
   const c=config();
@@ -45,15 +51,30 @@ export function studioResources(requireSpending = true) {
   const provider=new HiggsfieldStudioProvider(STUDIO_MODELS,()=>({id:process.env.HF_API_KEY_ID?.trim()??"",secret:process.env.HF_API_KEY_SECRET?.trim()??""}));
   return {store,engine:new CreativeStudio(store,provider,STUDIO_MODELS,c.monthlyUsd)};
 }
+export function studioPollingAvailable() {
+  const c=config();
+  return c.storage&&c.storageCredentials&&c.provider&&Number.isFinite(c.monthlyUsd)&&c.monthlyUsd>0;
+}
+/** Reading saved artifacts does not require provider keys, spending, or a budget. */
+export async function readStudioHistory(store:Pick<StudioStore,"read">=studioStorage(), monthlyUsd=config().monthlyUsd, now=Date.now()) {
+  const state=await store.read(),month=new Date(now).toISOString().slice(0,7);
+  const reservedUsd=state.jobs.filter(j=>j.month===month).reduce((sum,j)=>{
+    if(typeof j.usd!=="number"||!Number.isFinite(j.usd)||j.usd<0)throw new StudioError("STORAGE_UNAVAILABLE","Saved Studio accounting is invalid. Restore its metadata before generating.",503);
+    return sum+j.usd;
+  },0);
+  const available=Number.isFinite(monthlyUsd)&&monthlyUsd>0;
+  return {jobs:[...state.jobs].sort((a,b)=>b.createdAt-a.createdAt).slice(0,60),budget:{available,monthlyUsd:available?monthlyUsd:null,reservedUsd,warning:available&&reservedUsd>=monthlyUsd*.8,accounting:available?"estimates and reservations, not actual charges":"estimated reservations; monthly budget unavailable"}};
+}
 export async function liveStudioStatus() {
   const status=creativeStudioStatus();
   // No network checks while owner has storage explicitly disabled/quota suspended.
-  if(status.blockers.some(b=>b.code!=="SPENDING_DISABLED"))return status;
-  try { const {engine}=studioResources(false), b=await engine.budget();return {...status,budget:b,storageHealth:"readable"}; }
-  catch { return {...status,enabled:false,storageHealth:"unavailable",blockers:[...status.blockers,{code:"STORAGE_UNAVAILABLE",message:"Private storage health check failed. Storage may be quota-suspended; no generation can start without a durable reservation."}]}; }
+  if(!status.canReadJobs)return status;
+  try { const history=await readStudioHistory();return {...status,budget:history.budget,storageHealth:"readable"}; }
+  catch { return {...status,enabled:false,canReadJobs:false,storageHealth:"unavailable",blockers:[...status.blockers,{code:"STORAGE_UNAVAILABLE",message:"Private storage health check failed. Storage may be quota-suspended; no generation can start without a durable reservation."}]}; }
 }
+export function publicStudioSource(source:StudioJob["source"]) { return source?{jobId:source.jobId,outputIndex:source.outputIndex,aspectRatio:source.aspectRatio,width:source.width,height:source.height}:undefined; }
 export function publicStudioJob(j:StudioJob) {
-  return {id:j.id,model:j.model,status:j.status,usd:j.usd,createdAt:j.createdAt,updatedAt:j.updatedAt,redoOf:j.redoOf,error:j.status==="submitting"?"Submission is awaiting confirmation. If interrupted, check Higgsfield; this intent will not be replayed.":j.error,outputs:j.outputs?.map((o,i)=>({downloadUrl:`/api/creative-studio/jobs/${j.id}/outputs/${i}`,contentType:o.contentType,bytes:o.bytes,width:o.width,height:o.height}))};
+  return {id:j.id,model:j.model,status:j.status,caption:j.caption,aspectRatio:j.source?.aspectRatio??j.payload?.aspect_ratio,source:publicStudioSource(j.source),usd:j.usd,createdAt:j.createdAt,updatedAt:j.updatedAt,redoOf:j.redoOf,error:j.status==="submitting"?"Submission is awaiting confirmation. If interrupted, check Higgsfield; this intent will not be replayed.":j.error,outputs:j.outputs?.map((o,i)=>({downloadUrl:`/api/creative-studio/jobs/${j.id}/outputs/${i}`,contentType:o.contentType,bytes:o.bytes,width:o.width,height:o.height,...(o.contentType==="image/png"&&o.width===1080&&o.height?{sourceReference:{jobId:j.id,outputIndex:i}}:{})}))};
 }
 export const studioJSON = (data:unknown,status=200) => Response.json(data,{status,headers:{"Cache-Control":"no-store"}});
 export function studioFailure(e:unknown) { const known=e instanceof StudioError;return studioJSON({error:{code:known?e.code:"STUDIO_ERROR",message:known?e.message:"Studio could not complete this operation. Check the saved job before resubmitting."}},known?e.status:503); }

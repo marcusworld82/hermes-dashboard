@@ -68,7 +68,7 @@ export function MobileNav({ onSearch }: { onSearch: () => void }) {
             );
           })}
         </div>
-        <p className="text-xs text-[#9ca3af] mt-3 leading-relaxed">The CRM opens on your Mac only. Everything else works here.</p>
+        <p className="text-xs text-[#9ca3af] mt-3 leading-relaxed">Some tools need your Mac or an owner connection. Each page shows its status.</p>
       </Sheet>
     </>
   );

@@ -1,6 +1,6 @@
 import { CutlineError } from './cutline-cloud-core.mjs';
 const key = 'cutline/private/state-v1.json';
-const empty = () => ({ version: 1, jobs: {}, reservations: {}, spentCents: {}, projects: {} });
+const empty = () => ({ version: 1, jobs: {}, reservations: {}, spentCents: {}, projects: {}, heads: {}, libraries: {}, uploads: {} });
 const owned = (state, owner, id) => state.jobs[id]?.owner === owner ? state.jobs[id] : null;
 /** Private Blob ETag CAS. Every budget/claim is persisted before provisioning.
  * All storage failures (including quota suspension) propagate; never reset state.
@@ -14,13 +14,15 @@ export function createCutlineBlobBackend({ blob, credentialOptions = {}, approve
     if (result.statusCode !== 200 || result.blob.size > 8 * 1024 * 1024) throw new CutlineError('STORAGE_UNAVAILABLE', 'Invalid queue storage response.', 503);
     const state = await new Response(result.stream).json();
     if (state.version !== 1 || !state.jobs || !state.reservations || !state.projects || !state.spentCents) throw new CutlineError('STORAGE_INVALID', 'Queue storage schema mismatch.', 503);
+    state.heads ||= {}; state.libraries ||= {}; state.uploads ||= {};
     return { state, etag: result.blob.etag };
   }
   async function transaction(change) {
     for (let attempt = 0; attempt < 5; attempt++) {
       const { state, etag } = await read(); const result = change(state);
       try {
-        await blob.put(key, JSON.stringify(state), { ...credentialOptions, access: 'private', addRandomSuffix: false, allowOverwrite: !!etag, contentType: 'application/json', ...(etag ? { ifMatch: etag } : {}) });
+        const serialized = JSON.stringify(state); if (Buffer.byteLength(serialized) > 8 * 1024 * 1024) throw new CutlineError('STORAGE_FULL', 'Project index is full; retain or archive old revisions before continuing.', 503);
+        await blob.put(key, serialized, { ...credentialOptions, access: 'private', addRandomSuffix: false, allowOverwrite: !!etag, contentType: 'application/json', ...(etag ? { ifMatch: etag } : {}) });
         return structuredClone(result);
       } catch (error) {
         if (error?.name !== 'BlobPreconditionFailedError' && !/already exists/i.test(error?.message || '')) throw error;
@@ -48,6 +50,20 @@ export function createCutlineBlobBackend({ blob, credentialOptions = {}, approve
         return jobId;
       }); },
       settle({ reservation, cleanupFailed }) { return transaction(state => { const r = state.reservations[reservation]; if (!r) throw new CutlineError('BUDGET_STATE', 'Reservation missing.'); r.settled = !cleanupFailed; r.cleanupFailed = cleanupFailed; return r; }); },
+    },
+    uploads: {
+      create(record) { return transaction(state => { const pending = Object.values(state.uploads).filter(u => ['pending','token-issued','validating'].includes(u.state) && u.expiresAt > now()); if (pending.length >= 3 || Object.keys(state.uploads).length >= 500) throw new CutlineError('UPLOAD_CAPACITY', 'Pending upload capacity reached. Complete existing uploads or ask the owner to review retention.', 409); state.uploads[record.id] = record; return record; }); },
+      async get(owner, id) { const record = (await read()).state.uploads[id]; if (!record || record.owner !== owner) throw new CutlineError('UPLOAD_NOT_FOUND', 'Owned upload not found.', 404); return record; },
+      issue(owner, id, path) { return transaction(state => { const u = state.uploads[id]; if (!u || u.owner !== owner || u.path !== path || u.state !== 'pending' || u.expiresAt <= now()) throw new CutlineError('UPLOAD_TOKEN_DENIED', 'Upload token is expired, issued or not owned.', 409); u.state = 'token-issued'; return u; }); },
+      claim(owner, id) { return transaction(state => { const u = state.uploads[id]; if (!u || u.owner !== owner || u.state !== 'token-issued' || u.expiresAt <= now()) throw new CutlineError('UPLOAD_FINALIZE_DENIED', 'Upload cannot be finalized. Start a new upload if its token expired.', 409); u.state = 'validating'; return u; }); },
+      finish(owner, id, change) { return transaction(state => { const u = state.uploads[id]; if (!u || u.owner !== owner || u.state !== 'validating') throw new CutlineError('UPLOAD_STATE', 'Upload validation is not active.', 409); Object.assign(u, change); return u; }); },
+    },
+    repository: {
+      async list(owner) { return Object.values((await read()).state.heads).filter(p => p.owner === owner).sort((a,b) => b.updatedAt-a.updatedAt); },
+      async latest(owner, id) { const p = (await read()).state.heads[`${owner}:${id}`]; if (!p || p.owner !== owner) throw new CutlineError('PROJECT_NOT_FOUND', 'Project not found.', 404); return p; },
+      append(owner, id, baseRevision, record) { return transaction(state => { const k = `${owner}:${id}`; const prior = state.heads[k]; if (!prior && Object.keys(state.heads).length >= 200) throw new CutlineError('PROJECT_CAPACITY', 'Cloud project capacity reached. Ask the owner to review storage retention.', 409); if ((prior?.revision || 0) !== baseRevision) throw new CutlineError('REVISION_CONFLICT', 'A newer revision exists. Reload before saving; your changes were not overwritten.', 409); const next = { ...record, owner, id, revision: baseRevision + 1 }; state.heads[k] = next; state.projects[`${k}:${next.revision}`] = next; return next; }); },
+      async library(owner, kind) { return Object.values((await read()).state.libraries[`${owner}:${kind}`] || {}); },
+      saveLibrary(owner, kind, item) { return transaction(state => { const k = `${owner}:${kind}`; state.libraries[k] ||= {}; if (Object.keys(state.libraries[k]).length >= 200 && !state.libraries[k][item.name]) throw new CutlineError('LIBRARY_FULL', 'Saved library limit reached.', 409); state.libraries[k][item.name] = item; return item; }); },
     },
     projects: {
       async authorize(owner, id, revision) { const project = (await read()).state.projects[`${owner}:${id}:${revision}`]; if (!project || project.owner !== owner) throw new CutlineError('PROJECT_NOT_FOUND', 'Owned project revision not found.', 404); return project; },

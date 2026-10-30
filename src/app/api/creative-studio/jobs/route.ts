@@ -1,10 +1,19 @@
 import { connection } from "next/server";
 import { StudioError } from "@/lib/server/creative-studio-core";
-import { studioResources, studioJSON, studioFailure, publicStudioJob, sameOrigin, studioBody } from "@/lib/server/creative-studio-runtime";
+import { studioResources, studioJSON, studioFailure, publicStudioJob, sameOrigin, studioBody, readStudioHistory, studioPollingAvailable } from "@/lib/server/creative-studio-runtime";
 export const maxDuration = 120;
 export async function GET() {
   await connection();
-  try {const {engine}=studioResources(false);const jobs=await engine.list();for(const j of jobs.filter(j=>["queued","in_progress","persisting"].includes(j.status)).slice(0,3))await engine.poll(j.id);return studioJSON({jobs:(await engine.list()).map(publicStudioJob),budget:await engine.budget(),storageAvailable:true});}
+  try {
+    let history=await readStudioHistory();
+    const pollingAvailable=studioPollingAvailable();
+    if(pollingAvailable) {
+      const {engine}=studioResources(false);
+      for(const j of history.jobs.filter(j=>["queued","in_progress","persisting"].includes(j.status)).slice(0,3))await engine.poll(j.id);
+      history=await readStudioHistory();
+    }
+    return studioJSON({jobs:history.jobs.map(publicStudioJob),budget:history.budget,storageAvailable:true,pollingAvailable});
+  }
   catch(e){return studioFailure(e);}
 }
 export async function POST(request:Request) {

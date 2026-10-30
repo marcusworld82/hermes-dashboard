@@ -28,7 +28,7 @@ Cloud `GET /api/cutline-cloud/status` requires the existing Hermes session (also
 - `POST /api/cutline-cloud/jobs/[id]/dispatch` is the explicit paid execution entrypoint, after all flags and durable budget reservation pass. It awaits one worker execution under a 300-second route limit; worker render timeout is 240 seconds. Durable atomic claim prevents duplicate render dispatch. An expired running lease becomes interrupted; dispatch never requeues it. Redo requires a new job request id.
 - `POST /api/cutline-cloud/jobs/[id]/cancel` cancels queued jobs only. Running cancellation is rejected explicitly; timeout handles active Sandbox termination. No fake cancellation claim.
 - `GET /api/cutline-cloud/jobs/[id]/output` requires an owned succeeded job and streams its private MP4, returning no Blob URL. Saved job reads/downloads remain available when spending is paused, provided private storage is enabled; they do not load compiler/Sandbox.
-- Mutations independently verify same-origin HTTPS and the existing Hermes session, in addition to the app proxy. Existing Hermes is single-owner; server supplies owner=`owner`, never a request field. Generic failures redact SDK/storage paths, tokens and stderr. No job listing or media upload endpoint is introduced.
+- Mutations independently verify same-origin HTTPS and the existing Hermes session, in addition to the app proxy. Existing Hermes is single-owner; server supplies owner=`owner`, never a request field. Generic failures redact SDK/storage paths, tokens and stderr. No job listing is introduced. Storage-only project/media endpoints are described below.
 
 Required owner environment values (server-only):
 
@@ -63,7 +63,7 @@ Install trusted assets at fixed server-only `cloud/cutline-runtime-assets/` (rel
 
 All fonts used by a saved project must be licensed and listed. Loader validates fixed filenames, limits, SHA256 and realpath containment; assets cannot be request paths or URLs. `Avenir Next` is required because it is the original engine fallback; absent licensing, cloud rendering stays blocked rather than silently changing typography. Owner asset bundle must be included in server deployment packaging; no assets were fabricated or added by this task.
 
-Owner must privately ingest verified media and immutable revision metadata through the server runtime API before enqueue. No browser upload route exists, so the UI must keep upload disabled. Configure an external durable scheduler to call the authenticated explicit dispatch route if browser-independent scheduled dispatch is desired; this task does not install a scheduler or send any messages. Browser users can explicitly dispatch one queued job; request completion is awaited, never fire-and-forget.
+The cloud manager now ingests verified private MP4s and creates immutable revisions through storage-only HTTP routes. Upload remains disabled until the owner explicitly enables its flags and restores storage. Configure an external durable scheduler to call the authenticated explicit dispatch route if browser-independent scheduled dispatch is desired; this task does not install a scheduler or send any messages. Browser users can explicitly dispatch one queued job; request completion is awaited, never fire-and-forget.
 
 ## Feature fidelity matrix
 
@@ -71,19 +71,19 @@ Inspected source: original local `CAPTION-STUDIO/README.md`, `lib.mjs`, `engine.
 
 | Feature | Original behavior and requirement | Cloud state |
 | --- | --- | --- |
-| Word edits | Drag/multiselect/nudge/edit/resize/snap/undo, autosaved doc | Browser shell preserved; owned revision persistence implemented; HTTP editor backend disconnected |
+| Word edits | Drag/multiselect/nudge/edit/resize/snap/undo, autosaved doc | Browser shell preserved; Owned revision persistence and original-editor HTTP bridge implemented; live visual/control test not rerun |
 | Spotlight/scopes | All/small/spotlight text; word/caption/speaker/global inheritance | Same browser engine retained; compiler preserves document data; visual fidelity unverified |
 | Speakers | Python/numpy voice-print guessing, manual assignments, per-speaker looks | Detection absent; not true diarization; existing label data must be preserved |
 | Keyframes/curves | Caption move/scale/rotation/fade and saved curves | Requires same doc+engine and curve storage; unverified |
 | Motion | Caption engine animates preview and render | Compiler and adapter preserve and verify engine digest; visual fidelity unverified |
 | Video transitions | Punch/zoom/whip/spin/shake/flash/dip/glitch/light leak; face targeting; FFmpeg cuts | Preserve engine renderVideo, transition doc, face data and cuts; unverified |
 | SFX | Whoosh/heavy whoosh/click, caption and transition timing/volume | Must bundle original licensed audio privately; not added by this change |
-| Saved styles/layouts | Local JSON layouts/styles/curves | Revision storage exists; style/layout editing routes not connected |
+| Saved styles/layouts | Local JSON layouts/styles/curves | Owned style/layout/curve GET/POST persistence implemented |
 | Keep face clear | Apple Vision Swift binary at two samples/sec, manual box fallback | Detector Mac-only; Linux substitute not implemented; retain manual/precomputed data |
 | Fonts | Mac font menu; composition uses local installed families | Linux availability/licensing/metrics differ; no silent font substitution |
 | Translation | Mac `claude -p`, text only, length-weighted translated timing | Mac-only; no cloud API/account migration |
 | Watch folder | Mac INBOX-AUTO/done/OUTPUT, polls every ten seconds | Mac-only; serverless cannot watch a user's Mac folder |
-| SRT | Local project export file | No cloud SRT HTTP endpoint; source engine SRT remains available locally |
+| SRT | Local project export file | Server-generated SRT download uses unchanged engine, with owned project authorization |
 | MP4 | Local shared engine→HF check/render→render.mp4 | Actual SDK adapter code, mocked only; production blocked |
 | CLI/hands-off | `cli.mjs auto`, transcription/faces/layout/auto-transitions | Local only; cloud transcription/workflow not implemented |
 
@@ -107,7 +107,7 @@ Render execution has a maximum 240-second timer, abort signal and Sandbox TTL. T
 
 ## Verification
 
-`node --test tests/cutline-cloud.test.mjs`: 15 passing tests, covering fail-closed status, strict input, streamed body bounds, unsafe/duplicate bundle paths, owned async/idempotent jobs, single claim, private output ids, budget-before-provisioning, timeout stop/no retry, Redo, redacted failures, failed-stop reservation retention, exact SDK snapshot/network/command/file binding, SHA256 mismatch and private Blob write/download paths, compiler injection/font rejection, CAS daily budget enforcement and interrupted leases. Cloud TypeScript check passes. No live or paid test ran.
+`node --test tests/cutline-cloud.test.mjs`: 22 passing tests across tests/cutline-cloud*.test.mjs, covering fail-closed status, strict input, streamed body bounds, unsafe/duplicate bundle paths, owned async/idempotent jobs, single claim, private output ids, budget-before-provisioning, timeout stop/no retry, Redo, redacted failures, failed-stop reservation retention, exact SDK snapshot/network/command/file binding, SHA256 mismatch and private Blob write/download paths, compiler injection/font rejection, CAS daily budget enforcement and interrupted leases. Cloud TypeScript check passes. No live or paid test ran.
 
 The durable backend charges each attempted render the full approved per-job reservation against the day even after successful cleanup, avoiding optimistic under-accounting. It is a conservative application ledger, not a Vercel billing limit. Approve a sufficient worst-case infrastructure price before any live test. CAS state is bounded to 8 MiB and needs retention/compaction before sustained use. Runtime source streaming is bounded to 128 MiB.
 
@@ -130,3 +130,44 @@ const runtime = createConfiguredCutlineRuntime({
 Root task subsequently installed pinned @vercel/sandbox@3.9.1 and @vercel/blob@2.8.2. Adapter method signatures/networkPolicy and Blob ifMatch were checked against their installed types. No SDK operation was invoked.
 
 HTTP verification additionally covers unauthenticated status rejection, cross-origin POST rejection, configuration-before-runtime gating, enqueue without paid execution, explicit single dispatch, owned private output and downloads after pausing spending. Root and cloud TypeScript checks plus targeted cloud ESLint pass. No real render was run.
+
+
+## Cloud project ingestion and original-editor bridge (completed implementation)
+
+Storage-only editing is separate from paid rendering. It requires `CUTLINE_CLOUD_STORAGE_ENABLED=true` and existing private Blob credentials; uploading also requires `CUTLINE_CLOUD_UPLOADS_ENABLED=true`. These flags do not enable Sandbox/spending. `canEdit`, `canUpload`, `directUploadAvailable` and `uploadMaxBytes` describe owner configuration, not a successful storage health check. Actual quota/storage errors return 503; the UI never displays ephemeral writes as saved.
+
+| Endpoint | Behavior |
+| --- | --- |
+| GET /api/cutline-cloud/projects | Owned project heads with title, immutable revision, source dimensions/duration and update time |
+| POST /api/cutline-cloud/projects?name=... | Raw `video/mp4` fallback, max 4 MiB below Vercel function body limit; server probes bytes, generates ids, persists private source and first revision |
+| GET /api/cutline-cloud/projects/[id] | Latest owned doc and revision |
+| PUT /api/cutline-cloud/projects/[id] | `{baseRevision,doc}`; max 1 MiB; validates bounded safe doc, fixes source metadata to verified values, stores a new private JSON blob and atomically advances CAS head; conflict is 409 |
+| GET /api/cutline-cloud/projects/[id]/source | Authenticated private streaming with single HTTP byte-range support; no storage URL exposed |
+| GET /api/cutline-cloud/projects/[id]/srt | Attachment generated by unchanged `CaptionEngine.toSRT` from latest saved owned document |
+| GET/POST /api/cutline-cloud/library/styles or layouts | Owned saved styles/curves/layouts, bounded validated JSON; max 200 names per library |
+| GET /api/cutline-cloud/editor?p=[id] | Original bundled editor served with injected bridge; vendor files unchanged |
+| GET /api/cutline-cloud/fonts and assets/[name] | Approved font list/WOFF2 and original trusted audio only; no arbitrary paths |
+
+`CloudCutlineManager` appears in cloud `/cutline` when the Mac is offline. It lists private cloud projects, uploads and opens the original editor in an authenticated iframe/new tab. Mac projects are not moved. Imported SRT/VTT/timed JSON and manual caption edits work through the original engine/control code. The bridge handles both vendor-normalized `/api/cutline/runtime/api/*` and original `/api/project/*` calls, rewrites browser media source assignment and serializes autosaves. Revision conflicts retain dirty state and show NOT SAVED; unload warns about unsaved changes. Stored titles/text never enter executable bridge HTML. All served inline scripts are syntax-compiled in tests, including the budget confirmation text. Render success links are created through DOM properties, not interpolated HTML.
+
+Automatic transcription, Apple Vision face finding, Python speaker detection, translation and watch-folder/CLI operations remain unavailable in cloud. Buttons for the first four are disabled with explicit Mac-service descriptions; precomputed face tracks/manual boxes and speaker looks remain editable. Transitions/motion/keyframes/spotlight and imported caption controls retain source code. Font menus/preview load approved licensed WOFF2 when present; otherwise the UI warns about browser-font fallback and unverified render typography. No GSAP CDN exists in the original editor; the renderer uses approved local GSAP. App chrome receives a white/black/red CSS override only in the served copy; caption style presets are unchanged. Render click displays the current per-job and daily ceilings and requires explicit confirmation before one enqueue/dispatch. No automatic paid retries occur.
+
+### Direct private uploads up to 128 MiB
+
+Owner additionally sets `CUTLINE_CLOUD_DIRECT_UPLOADS_ENABLED=true` and supplies the **existing** private-store `BLOB_READ_WRITE_TOKEN`. Installed Blob 2.8.2 `handleUpload` token issuance needs this read/write credential; OIDC-only storage still supports the 4 MiB fallback. Never expose this credential to the client. No callback route or proxy/auth exemption is added.
+
+1. Authenticated same-origin POST `/uploads/prepare` with `{name,size,contentType:"video/mp4"}` allocates a durable owned session and server-selected project/source path. At most three active unexpired allocations exist globally, with 15-minute expiration; retained upload records are capped at 500 and project heads at 200. No automatic cleanup/deletion hides quota usage.
+2. Browser SDK `upload()` calls authenticated same-origin POST `/uploads/token`. Handler accepts **only** `blob.generate-client-token` with the exact owned allocation path/id. Durable CAS allows one token issuance; token is ≤10 minutes, exact declared maximum bytes, MP4 MIME only, no suffix and no overwrite. `onUploadCompleted` is omitted; inspected SDK code emits no callback configuration when omitted. Callback-shaped requests are rejected. No unauthenticated endpoint exists.
+3. Browser uploads bytes directly to the private Blob store. SDK transport may internally retry file parts; this never triggers rendering or paid Sandbox work. Browser ignores the SDK storage URL and finalizes by upload id only.
+4. Authenticated POST `/uploads/finalize` accepts only `{uploadId}`. Server resolves the durable owned path, checks actual Blob pathname/MIME/size against the allocation, bounds private retrieval and probes actual MP4 box signature/duration/video dimensions. Only then does it create the immutable doc/head. Finalize is idempotent after successful attachment.
+5. Invalid or uncertain uploads are marked quarantined/unattached and retained private. No auto-deletion occurs in this direct lane. Expired/pending/quarantined records require owner retention review; they are never rendered or listed as completed projects. A stopped finalize may require owner review; no callback claims success.
+
+The MP4 probe parses ftyp, complete box boundaries, moov/mvhd and vide trak/tkhd metadata. It rejects malformed/truncated/fragmented/multi-video files, non-MP4 signature/MIME, videos over 120 seconds and odd/out-of-bounds dimensions (16–1920). It uses actual bytes rather than browser duration claims. It is a structural metadata probe, **not a decoder or malware scan**; browser codec compatibility and actual decode integrity need a separately authorized live fixture check. Sources remain typed video bytes, never executable HTML/JS. No arbitrary remote URLs are accepted or fetched. Rendering still caps the entire composition bundle at 128 MiB, so a near-limit source plus fonts/audio can be rejected before budget/provisioning.
+
+Project metadata/heads, revision references, jobs, upload sessions and libraries use an 8 MiB bounded private CAS index. Immutable document bodies are stored in separate private blobs, not repeated inside that index. Retention/compaction requires owner management before sustained use; no automatic deletion was introduced. Private range responses stream and cancel upstream when the requested end is reached rather than buffering full videos in application memory.
+
+### Validation and build evidence
+
+22 deterministic offline tests pass across both Cutline test files. Added coverage includes actual MP4 structural parsing, private ingestion/listing/owned load, immutable old-revision preservation, simultaneous CAS save conflict, source ranges, server SRT, style/layout ownership, authenticated storage/upload gating, direct token ownership/replay/limits, no callback support, idempotent finalize, invalid-byte quarantine/no deletion, bridge script compilation/order/media rewrite and visible budget review. Cloud TypeScript and targeted ESLint pass. No live Blob upload or paid render ran.
+
+Build verification reached an environment limit: default Turbopack fails its CSS worker port bind with EPERM (including approved process-permission retry). `next build --webpack` bypasses that but cannot resolve `fonts.googleapis.com` to fetch the existing shared layout's Outfit font. No Cutline compilation error remained before that external-font failure. Shared layout/fonts were not changed by this subtask.
