@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en"><head><base href="/api/cutline/runtime/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cutline Studio</title>
+<style>
+:root{--bg:#0b0d12;--panel:#12151c;--card:#181c25;--line:#262b37;--fg:#eef0f4;--dim:#8a91a3;--acc:#FFD23F;--acc2:#4FC3FF;--ok:#7CFF9B;--bad:#ff6b6b}
+[hidden]{display:none!important}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 "Avenir Next",system-ui,sans-serif}
+button,select,input{font:inherit;color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 16px 60px;display:flex;flex-direction:column;gap:20px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header b{font-weight:800;font-size:22px;letter-spacing:.02em}header b i{font-style:normal;color:var(--acc)}
+.dim{color:var(--dim)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:16px;font-weight:800}
+.drop{border:1.5px dashed #3a4152;border-radius:12px;padding:22px;text-align:center;cursor:pointer;color:var(--dim)}
+.drop.over{border-color:var(--acc);color:var(--fg)}
+.btn{border:1px solid var(--line);background:#0f1218;border-radius:9px;padding:8px 12px;cursor:pointer}
+.btn.pri{background:var(--acc);color:#1d1600;border-color:var(--acc);font-weight:800}
+select,input[type=text]{background:#0f1218;border:1px solid var(--line);border-radius:8px;padding:7px 8px;min-width:0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.jobs{display:flex;flex-direction:column;gap:6px}
+.job{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;background:#0f1218;border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.job .st{font-size:12px}
+.st.running{color:var(--acc2)}.st.done{color:var(--ok)}.st.failed{color:var(--bad)}
+.lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.proj{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.proj img{width:100%;aspect-ratio:9/16;object-fit:cover;background:#000;display:block}
+.proj div{padding:8px;display:flex;flex-direction:column;gap:6px}
+.proj b{font-size:12px;overflow-wrap:anywhere}
+.proj a{color:var(--acc);font-size:12px}
+.steps{display:flex;gap:8px;flex-wrap:wrap}.steps span{background:#0f1218;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--dim)}
+code{background:#0f1218;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12px;overflow-wrap:anywhere}
+</style><style>:root{--bg:#fff;--panel:#fff;--card:#f5f5f5;--line:#d4d4d4;--fg:#000;--dim:#525252;--acc:#dc2626;--acc2:#000;--ok:#000;--bad:#b91c1c;--danger:#b91c1c}button,input,select,textarea{font-size:14px}button:focus-visible,a:focus-visible{outline:3px solid #dc2626;outline-offset:3px}.chip[aria-pressed=true],.tab[aria-selected=true]{color:#fff}body{color:#000}a{color:inherit}</style></head><body>
+<div class="wrap">
+ <header><b>CUTLINE<i>.</i> STUDIO</b><span class="dim">Upload a video. Caption it yourself, or let the studio do it.</span></header>
+
+ <div class="grid2">
+  <section class="card">
+   <h2>Edit it myself</h2>
+   <div class="steps"><span>1 Upload</span><span>2 Captions ready</span><span>3 Style and move any word</span><span>4 Render</span></div>
+   <label class="drop" id="dropEdit">Drop a video here or click to pick one<input type="file" accept="video/*" id="fileEdit" hidden></label>
+   <div class="dim" id="editStatus">Opens the editor with the captions already made.</div>
+  </section>
+  <section class="card">
+   <h2>Caption it for me</h2>
+   <div class="steps"><span>1 Upload</span><span>2 Transcribe and find faces</span><span>3 Your style</span><span>4 Finished video</span></div>
+   <div class="row"><span class="dim">Style</span><select id="autoStyle"></select></div>
+   <label class="drop" id="dropAuto">Drop one or more videos here<input type="file" accept="video/*" id="fileAuto" multiple hidden></label>
+   <div class="dim">Every hands-off video also becomes an editable project, so you can still fix a word later.</div>
+  </section>
+ </div>
+
+ <section class="card">
+  <h2>Runs on its own</h2>
+  <div class="dim">Drop videos in the watch folder (Finder, or a synced Google Drive folder). Every 10 seconds the studio checks it, captions anything new with the style below and puts the finished video in the output folder.</div>
+  <div class="row"><span class="dim" style="min-width:110px">Watch folder</span><input type="text" id="watchFolder" style="flex:1"></div>
+  <div class="row"><span class="dim" style="min-width:110px">Output folder</span><input type="text" id="outputFolder" style="flex:1"></div>
+  <div class="row"><span class="dim" style="min-width:110px">Style</span><select id="watchStyle"></select><span class="dim">Sound</span><select id="watchSound"><option value="none">No sound</option><option value="whoosh">Whoosh</option></select><button class="btn pri" id="saveStudio">Save</button></div>
+ </section>
+
+ <section class="card">
+  <h2>Jobs</h2>
+  <div class="jobs" id="jobs"><span class="dim">No jobs yet.</span></div>
+ </section>
+
+ <section>
+  <h2 style="font-size:16px;margin:0 0 10px">Projects</h2>
+  <div class="lib" id="lib"></div>
+ </section>
+</div>
+<script>
+// Adapt original local API URLs and JSON bodies to Hermes' authenticated proxy.
+const cutlineFetch = window.fetch.bind(window);
+window.fetch = (input, options = {}) => {
+ let url = typeof input === 'string' ? input : input.url;
+ if (url.startsWith('/api/') && !url.startsWith('/api/cutline/runtime/')) url = '/api/cutline/runtime' + url;
+ if (url.startsWith('/api/cutline/runtime/') && options.method === 'POST' && typeof options.body === 'string') {
+  const headers = new Headers(options.headers);
+  if (/\/srt(?:\?|$)/.test(url)) options = {...options, body: JSON.stringify({srt: options.body})};
+  headers.set('Content-Type', 'application/json'); options = {...options, headers};
+ }
+ return cutlineFetch(url, options);
+};
+</script>
+<script>
+const $ = (id) => document.getElementById(id), api = (u, o) => fetch(u, o).then((r) => r.json());
+let studio = null;
+function styleOptions(sel, cur) {
+  sel.innerHTML = "";
+  const g1 = document.createElement("optgroup"); g1.label = "Saved layouts"; studio.layouts.forEach((l) => g1.appendChild(new Option(l, "layout:" + l)));
+  const g2 = document.createElement("optgroup"); g2.label = "Presets"; studio.presets.forEach((p) => g2.appendChild(new Option(p, "preset:" + p)));
+  if (studio.layouts.length) sel.appendChild(g1); sel.appendChild(g2); sel.value = cur;
+}
+async function loadStudio() {
+  studio = await api("/api/cutline/runtime/api/studio");
+  const cur = studio.autoLayout ? "layout:" + studio.autoLayout : "preset:" + studio.autoPreset;
+  styleOptions($("autoStyle"), cur); styleOptions($("watchStyle"), cur);
+  $("watchFolder").value = studio.watchFolder; $("outputFolder").value = studio.outputFolder; $("watchSound").value = studio.sound || "none";
+}
+$("saveStudio").onclick = async () => {
+  const [k, v] = $("watchStyle").value.split(/:(.*)/s);
+  await api("/api/cutline/runtime/api/studio", { method: "POST", body: JSON.stringify({ watchFolder: $("watchFolder").value.trim(), outputFolder: $("outputFolder").value.trim(), autoPreset: k === "preset" ? v : studio.autoPreset, autoLayout: k === "layout" ? v : "", sound: $("watchSound").value }) });
+  await loadStudio(); $("saveStudio").textContent = "Saved"; setTimeout(() => ($("saveStudio").textContent = "Save"), 1200);
+};
+function dropzone(zone, input, onFiles) {
+  input.onchange = () => input.files.length && onFiles([...input.files]);
+  zone.ondragover = (e) => { e.preventDefault(); zone.classList.add("over"); };
+  zone.ondragleave = () => zone.classList.remove("over");
+  zone.ondrop = (e) => { e.preventDefault(); zone.classList.remove("over"); const f = [...e.dataTransfer.files].filter((x) => x.type.startsWith("video")); if (f.length) onFiles(f); };
+}
+dropzone($("dropEdit"), $("fileEdit"), async ([f]) => {
+  $("editStatus").textContent = "Uploading, transcribing and finding faces. This takes about as long as the video...";
+  const name = f.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+  const r = await api("/api/cutline/runtime/api/new?name=" + encodeURIComponent(name), { method: "POST", body: f });
+  if (r.id) location.href = "/cutline-assets/editor.html?p=" + r.id; else $("editStatus").textContent = r.error || "Upload failed";
+});
+dropzone($("dropAuto"), $("fileAuto"), async (files) => {
+  const [k, v] = $("autoStyle").value.split(/:(.*)/s);
+  for (const f of files) await api(`/api/auto?name=${encodeURIComponent(f.name)}&${k}=${encodeURIComponent(v)}`, { method: "POST", body: f });
+  drawJobs();
+});
+async function drawJobs() {
+  const js = await api("/api/cutline/runtime/api/jobs"), box = $("jobs");
+  if (!js.length) return;
+  box.innerHTML = "";
+  js.forEach((j) => {
+    const d = document.createElement("div"); d.className = "job";
+    const a = document.createElement("div"); const n = document.createElement("b"); n.textContent = j.name + (j.fromWatch ? " (watch folder)" : ""); const st = document.createElement("div"); st.className = "st " + j.status; st.textContent = j.status === "done" ? `Done: ${j.captions} captions` : j.step; a.append(n, st);
+    const b = document.createElement("div"); b.className = "row";
+    if (j.project) { const o = document.createElement("a"); o.href = "/cutline-assets/editor.html?p=" + j.project; o.textContent = "Open in editor"; o.className = "btn"; b.appendChild(o); }
+    if (j.output) { const o = document.createElement("span"); o.className = "dim"; o.style.fontSize = "12px"; o.textContent = j.output; b.appendChild(o); }
+    d.append(a, b); box.appendChild(d);
+  });
+}
+async function drawLib() {
+  const list = await api("/api/cutline/runtime/api/library"), box = $("lib"); box.innerHTML = "";
+  list.forEach((p) => {
+    const c = document.createElement("div"); c.className = "proj";
+    const img = document.createElement("img"); img.src = "/api/cutline/runtime/" + p.thumb; img.alt = ""; img.onclick = () => (location.href = "/cutline-assets/editor.html?p=" + p.id); img.style.cursor = "pointer";
+    const d = document.createElement("div"); const b = document.createElement("b"); b.textContent = p.id; d.appendChild(b);
+    const o = document.createElement("a"); o.href = "/cutline-assets/editor.html?p=" + p.id; o.textContent = "Open in editor"; d.appendChild(o);
+    if (p.render) { const r = document.createElement("a"); r.href = "/api/cutline/runtime/" + p.render; r.target = "_blank"; r.textContent = "Watch render"; d.appendChild(r); }
+    c.append(img, d); box.appendChild(c);
+  });
+}
+loadStudio(); drawJobs(); drawLib();
+setInterval(drawJobs, 3000); setInterval(drawLib, 20000);
+</script>
+</body></html>

@@ -1,0 +1,16 @@
+import type { Payload, StudioModel } from "./creative-studio-core.ts";
+export type PublicStudioModel = { id: string; label: string; kind: "image" | "video"; aspectRatios: string[]; durations: number[]; resolutions: string[]; source: string; verifiedAt: string };
+const imageRatios = ["1:1", "2:1", "1:2", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "6:10", "14:10", "10:14", "16:9", "9:16"];
+const videoRatios = ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"];
+const own = (p: Payload, allowed: string[]) => Object.keys(p).every(k => allowed.includes(k));
+const optionalEnum = (p: Payload, key: string, allowed: unknown[]) => p[key] === undefined || allowed.includes(p[key]);
+const prompt = (p: Payload, max: number) => typeof p.prompt === "string" && p.prompt.trim().length > 0 && p.prompt.length <= max;
+const rgb = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).every(k => k === "rgb") && Array.isArray((v as Payload).rgb) && ((v as Payload).rgb as unknown[]).length === 3 && ((v as Payload).rgb as unknown[]).every(n => typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 255);
+export const STUDIO_MODELS: (StudioModel & PublicStudioModel)[] = [
+  { id: "recraft-v4.1-pro", label: "Recraft V4.1 Pro", kind: "image", endpoint: "recraft/v4.1/pro/text-to-image", source: "https://docs.higgsfield.ai/docs/models/recraft-v4-1-pro/generate", verifiedAt: "2026-10-30", aspectRatios: imageRatios, durations: [], resolutions: ["2k"],
+    validate: p => own(p,["prompt","resolution","aspect_ratio","output_format","colors","background_color"]) && prompt(p,10000) && optionalEnum(p,"resolution",["2k"]) && optionalEnum(p,"aspect_ratio",imageRatios) && optionalEnum(p,"output_format",["jpg","png","webp"]) && (p.colors === undefined || (Array.isArray(p.colors) && p.colors.every(rgb))) && (p.background_color === undefined || rgb(p.background_color)) },
+  { id: "seedance-2.5-t2v", label: "Seedance 2.5", kind: "video", endpoint: "bytedance/seedance-2.5/text-to-video", source: "https://open.higgsfield.ai/models/bytedance/seedance-2.5/text-to-video/api-reference", verifiedAt: "2026-10-30", aspectRatios: videoRatios, durations: [5,10], resolutions: ["480p","720p","1080p"],
+    // App supports a deliberately bounded subset of the official 4–30 second range.
+    validate: p => own(p,["prompt","duration","resolution","aspect_ratio","output_format","generate_audio"]) && prompt(p,10000) && optionalEnum(p,"duration",[5,10]) && optionalEnum(p,"resolution",["480p","720p","1080p"]) && optionalEnum(p,"aspect_ratio",videoRatios) && optionalEnum(p,"output_format",["mp4","mov"]) && (p.generate_audio === undefined || typeof p.generate_audio === "boolean") },
+];
+export const publicStudioModels = (): PublicStudioModel[] => STUDIO_MODELS.map(({id,label,kind,aspectRatios,durations,resolutions,source,verifiedAt}) => ({id,label,kind,aspectRatios,durations,resolutions,source,verifiedAt}));

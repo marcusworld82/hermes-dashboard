@@ -24,6 +24,8 @@ export const sections: { title: string; items: NavItem[] }[] = [
     title: "Workspace",
     items: [
       { href: "/dashboard", label: "Home", icon: LayoutDashboard, hint: "Today at a glance" },
+      { href: "/studio", label: "Studio", icon: Film, hint: "Pictures, carousels and video" },
+      { href: "/cutline", label: "Cutline Studio", icon: Film, hint: "Edit captions and video" },
       { href: "/pipeline", label: "Pipeline", icon: Flow, hint: "Inbox to shipped" },
       { href: "/kanban", label: "Kanban", icon: Kanban, hint: "Every Marcus OS card" },
       { href: "/chat", label: "Chat", icon: MessageSquare, hint: "Agents, groups, models" },
@@ -42,7 +44,7 @@ export const sections: { title: string; items: NavItem[] }[] = [
     title: "Business",
     items: [
       { href: "/social", label: "Social", icon: CalendarDays, hint: "Calendar and captions" },
-      { href: "/social/studio", label: "Social Studio", icon: CalendarDays, hint: "Instagram and LinkedIn drafts" },
+      { href: "/social/studio", label: "Social drafts", icon: CalendarDays, hint: "Instagram and LinkedIn drafts" },
       { href: "/content-research", label: "Content research", icon: Radar, hint: "Source headlines for briefs" },
       { href: "/lead-research", label: "Lead Research", icon: Radar, hint: "Apify to Notion leads" },
       { href: "/leads", label: "Lead inbox", icon: Users, hint: "Evidence, drafts and approval" },

@@ -1,5 +1,6 @@
 "use client";
 
+import { GuidedNavigation } from "./GuidedNavigation";
 import { Suspense, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./shell/MobileNav";
@@ -17,7 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense>
         <MobileNav onSearch={() => setSearch(true)} />
       </Suspense>
-      <main className="app-main flex-1 min-w-0 w-full">{children}</main>
+      <main className="app-main flex-1 min-w-0 w-full"><Suspense><GuidedNavigation /></Suspense>{children}</main>
       <Suspense>
         <QuickChat />
       </Suspense>

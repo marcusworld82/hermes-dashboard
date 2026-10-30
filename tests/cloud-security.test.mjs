@@ -10,3 +10,5 @@ test('updated dashboard families stay allowlisted while OAuth and secret setup s
  for(const route of ['/api/home-brief','/api/today','/api/agent-activity','/api/leads/one/rewrite','/api/outbox/bulk','/api/clients','/api/lead-research/refresh','/api/discovery','/api/claude-finder','/api/lead-intake','/api/business-settings','/api/morning-run','/api/prospects/promote','/api/content-research','/api/gmail','/api/gmail/poll','/api/composio/mcp/status','/api/composio/mcp/gmail'])assert.ok(safeApiPath(route),route);
  for(const route of ['/api/composio/settings','/api/composio/mcp/connect','/api/composio/mcp/callback','/api/gmail/connect','/api/gmail/callback','/api/gmail/composio/callback','/api/tools/recast'])assert.equal(safeApiPath(route),false,route);
 });
+
+test('Cutline relay allows only named project media',()=>{assert.ok(safeApiPath('/api/cutline/runtime/projects/demo/assets/source.mp4'));assert.ok(safeApiPath('/api/cutline/runtime/assets/click.wav'));for(const p of ['/api/cutline/runtime/projects/demo/doc.json','/api/cutline/runtime/projects/demo/assets/key.txt','/api/cutline/runtime/assets/secret.wav'])assert.equal(safeApiPath(p),false);});
