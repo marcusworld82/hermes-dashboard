@@ -95,3 +95,17 @@ test('invalid direct-upload bytes are quarantined, retained private, and never e
   const request = new Request('https://hermes.test/api/cutline-cloud/uploads/finalize', { method: 'POST', headers: { host: 'hermes.test', origin: 'https://hermes.test', cookie: `hermes_session=${makeSession(env.HERMES_SESSION_SECRET)}`, 'content-type': 'application/json' }, body: JSON.stringify({ uploadId: 'bad-upload' }) });
   const result = await handler(request, 'finalize'); assert.equal(result.status, 415); assert.equal((await f.backend.uploads.get('owner', 'bad-upload')).state, 'quarantined'); assert.equal((await f.projects.list('owner')).length, 0); assert.equal(f.objects.has(path), true);
 });
+
+test('cloud editor warns before debounce and keeps dirty until every queued edit is saved',async()=>{
+  const vm=await import('node:vm');const {cutlineCloudEditorBridge}=await import('../cloud/src/lib/server/cutline-cloud-editor.mjs');
+  const handlers={},elements=new Map(),writes=[];const window={fetch:async(path,options={})=>{if(options.method==='PUT')return new Promise(resolve=>writes.push({resolve,body:JSON.parse(options.body)}));return Response.json({revision:1,doc:{id:'fixture'}});},addEventListener:(name,fn)=>{handlers[name]=fn;}};
+  const document={getElementById:id=>elements.get(id),createElement:()=>({style:{},setAttribute(){}}),body:{appendChild:el=>elements.set(el.id,el)}};
+  vm.runInNewContext('('+cutlineCloudEditorBridge.toString()+')()',{window,document,location:{origin:'https://fixture.invalid'},URL,Response,Map,Promise,structuredClone,setTimeout,clearTimeout,console});
+  await window.fetch('/api/project/fixture');
+  const dirty=()=>{let prevented=false;handlers.beforeunload({preventDefault(){prevented=true;}});return prevented;};assert.equal(dirty(),false);
+  window.__cutlineCloudMarkDirty();assert.equal(dirty(),true,'warn immediately, before the original400ms timer fires');
+  const first=window.fetch('/api/project/fixture',{method:'POST',body:JSON.stringify({id:'fixture',style:'first'})});await new Promise(r=>setTimeout(r,0));assert.equal(writes.length,1);
+  window.__cutlineCloudMarkDirty();const second=window.fetch('/api/project/fixture',{method:'POST',body:JSON.stringify({id:'fixture',style:'second'})});
+  writes[0].resolve(Response.json({revision:2}));await first;await new Promise(r=>setTimeout(r,0));assert.equal(writes.length,2);assert.equal(writes[1].body.baseRevision,2);assert.equal(dirty(),true,'earlier save must not clear a newer unsaved edit');
+  writes[1].resolve(Response.json({revision:3}));await second;assert.equal(dirty(),false);
+});

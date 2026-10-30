@@ -75,7 +75,10 @@ canvas.curve{width:100%;height:170px;background:#0f1218;border:1px solid var(--l
 .status{font-size:11px;color:var(--dim)}
 .toast{position:fixed;bottom:16px;right:16px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;opacity:0;transition:opacity .2s;z-index:99}
 .toast.on{opacity:1}
-</style><style>:root{--bg:#fff;--panel:#fff;--card:#f5f5f5;--line:#d4d4d4;--fg:#000;--dim:#525252;--acc:#dc2626;--acc2:#000;--ok:#000;--bad:#b91c1c;--danger:#b91c1c}button,input,select,textarea{font-size:14px}button:focus-visible,a:focus-visible{outline:3px solid #dc2626;outline-offset:3px}.chip[aria-pressed=true],.tab[aria-selected=true]{color:#fff}body{color:#000}a{color:inherit}</style></head><body>
+</style><style>:root{--bg:#fff;--panel:#fff;--card:#f5f5f5;--line:#d4d4d4;--fg:#000;--dim:#525252;--acc:#dc2626;--acc2:#000;--ok:#000;--bad:#b91c1c;--danger:#b91c1c}button,input,select,textarea{font-size:14px}button:focus-visible,a:focus-visible{outline:3px solid #dc2626;outline-offset:3px}.chip[aria-pressed=true],.tab[aria-selected=true]{color:#fff}body{color:#000}a{color:inherit}</style><style>
+.sh .n{background:#000;color:#fff}.btn,select,input[type=number],input[type=text],textarea,.transcript,.job{background:#fff;color:#000}.chip{background:#fff;color:#111}.tab{background:#f5f5f5;color:#444}.chip[aria-pressed=true],.tab[aria-selected=true],.btn.pri{background:#dc2626;color:#fff}.btn:disabled{color:#777;background:#eee;cursor:not-allowed}.scard small{color:#fff;background:#000;padding:0 3px}.ptop{flex-wrap:wrap}.ptop b{white-space:nowrap}.ptop .hint{max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ptop select{min-width:80px;max-width:150px}.btn,.tab,select{min-height:36px}.transcript span.spot{background:#dc2626;color:white}.lib button:hover,.lib button[aria-pressed=true]{background:#eee;color:#000}canvas.curve{background:#fff}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #dc2626;outline-offset:2px}
+@media(max-width:900px){.app{display:flex;flex-direction:column;height:auto;min-height:100vh}.panel{order:2;overflow:visible;border-right:0}.stage-wrap{order:1;height:360px;min-height:360px;position:sticky;top:0;background:#f5f5f5;z-index:10;border-bottom:1px solid #ddd}.scroll{overflow:visible;padding-bottom:70px}.ptop .hint{max-width:80px}.styles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style></head><body>
 <div class="app">
 <aside class="panel">
  <div class="ptop"><a href="/cutline-assets/home.html" class="btn" title="Cutline Studio home" style="text-decoration:none">‹ Home</a><b>CUTLINE<i>.</i></b><span class="hint">Studio</span><span style="flex:1"></span><select id="proj" title="Project"></select><label class="btn" title="Add a new video">+ Video<input id="newvid" type="file" accept="video/*" hidden></label></div>
@@ -283,7 +286,7 @@ function doRegroup() {
 
 /* ---------- stage ---------- */
 function fitStage() {
-  const box = document.querySelector(".stage-wrap"), H = Math.min(box.clientHeight - 90, 860), W = H * doc.video.w / doc.video.h;
+  const box = document.querySelector(".stage-wrap"), H = Math.max(100, Math.min(box.clientHeight - 90, 860, (box.clientWidth - 28) * doc.video.h / doc.video.w)), W = H * doc.video.w / doc.video.h;
   phone.style.width = W + "px"; phone.style.height = H + "px";
   const s = W / doc.video.w;
   layer.style.width = doc.video.w + "px"; layer.style.height = doc.video.h + "px"; layer.style.transform = `scale(${s})`;
@@ -610,7 +613,7 @@ function syncControls() {
   chips("target", [["both", "All text"], ["words", "Small words"], ["spot", "Spotlight words"]], () => target, (v) => { target = v; syncControls(); });
   const L = effective();
   $("lookHint").textContent = scope === "words" ? `Editing ${sel.words.length} word(s). Glow here goes on just these words.` : scope === "caption" ? "Editing this caption only." : scope === "speaker" ? `Editing every caption by ${doc.speakers[(capOf() || {}).speaker || 0].name}.` : "Editing every caption.";
-  $("font").innerHTML = ""; fonts.forEach((f) => { const o = new Option(f, f); o.style.fontFamily = f; $("font").add(o); }); $("font").value = L.font; $("font").onchange = (e) => setLook({ font: e.target.value });
+  $("font").innerHTML = ""; if (L.font && !fonts.includes(L.font)) $("font").add(new Option(L.font + " (browser fallback)", L.font)); fonts.forEach((f) => { const o = new Option(f, f); o.style.fontFamily = f; $("font").add(o); }); $("font").value = L.font; $("font").onchange = (e) => setLook({ font: e.target.value });
   bindColor("color", () => L.color, (v) => setLook({ color: v, fill: "solid" }));
   bindRange("weight", () => L.weight, (v) => setLook({ weight: v }));
   toggle("italic", L.italic, (v) => setLook({ italic: v }));
