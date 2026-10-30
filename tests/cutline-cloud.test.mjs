@@ -119,13 +119,13 @@ test('snapshot preparation cannot provision without explicit approval and pinned
   assert.equal(creates, 0);
 });
 
-test('HTTP authenticates status, blocks cross-origin mutation and never loads disabled runtime', async () => {
+test('link-public HTTP opens status, blocks cross-origin mutation and never loads disabled runtime', async () => {
   const { createCutlineHTTP } = await import('../cloud/src/lib/server/cutline-cloud-http.mjs');
   const { makeSession } = await import('../cloud/src/lib/server/security.mjs'); let loads = 0;
   const env = { HERMES_SESSION_SECRET: 'offline-secret' }; const cookie = `hermes_session=${makeSession(env.HERMES_SESSION_SECRET)}`;
   const handle = createCutlineHTTP({ env, async loadRuntime() { loads++; throw Error('must not run'); } });
   const req = (method, origin = 'https://hermes.test', authenticated = true) => new Request('https://hermes.test/api/cutline-cloud/jobs', { method, headers: { host: 'hermes.test', origin, ...(authenticated ? { cookie } : {}), 'content-type': 'application/json' }, ...(method === 'POST' ? { body: JSON.stringify(input) } : {}) });
-  assert.equal((await handle(req('GET', undefined, false), 'status')).status, 401);
+  assert.equal((await handle(req('GET', undefined, false), 'status')).status, 200);
   assert.equal((await handle(req('POST', 'https://attacker.test'), 'enqueue')).status, 403);
   const blocked = await handle(req('POST'), 'enqueue'); assert.equal(blocked.status, 503); assert.equal(loads, 0);
   const status = await (await handle(req('GET'), 'status')).json(); assert.equal(status.canRender, false); assert.ok(status.blockerDetails.some(b => b.code === 'BUDGET_REQUIRED')); assert.equal(JSON.stringify(status).includes('offline-secret'), false);

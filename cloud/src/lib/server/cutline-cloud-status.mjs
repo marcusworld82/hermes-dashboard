@@ -1,9 +1,10 @@
+import {PUBLIC_PAID_GENERATION_ENABLED} from './link-public.mjs';
 export function cutlineCloudConfig(env = process.env) {
   const positive = name => { const n = Number(env[name]); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
   return {
     directUploads: env.CUTLINE_CLOUD_DIRECT_UPLOADS_ENABLED === 'true' && !!env.BLOB_READ_WRITE_TOKEN,
     uploads: env.CUTLINE_CLOUD_UPLOADS_ENABLED === 'true',
-    spending: env.CUTLINE_CLOUD_SPEND_ENABLED === 'true', storage: env.CUTLINE_CLOUD_STORAGE_ENABLED === 'true',
+    spending: PUBLIC_PAID_GENERATION_ENABLED && env.CUTLINE_CLOUD_SPEND_ENABLED === 'true', storage: env.CUTLINE_CLOUD_STORAGE_ENABLED === 'true',
     dispatch: env.CUTLINE_CLOUD_DISPATCH_ENABLED === 'true', assetsReady: env.CUTLINE_CLOUD_ASSETS_READY === 'true',
     snapshotId: /^[a-zA-Z0-9_-]{1,128}$/.test(env.CUTLINE_CLOUD_SNAPSHOT_ID || '') ? env.CUTLINE_CLOUD_SNAPSHOT_ID : '',
     storageCredentials: !!env.BLOB_READ_WRITE_TOKEN || (!!env.BLOB_STORE_ID && !!env.VERCEL_OIDC_TOKEN),

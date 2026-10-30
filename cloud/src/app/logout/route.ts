@@ -1,1 +1,1 @@
-export function POST(){return new Response(null,{status:303,headers:{Location:'/login','Set-Cookie':'hermes_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0','Cache-Control':'no-store'}})}
+export function POST(){return new Response(null,{status:303,headers:{Location:'/dashboard','Set-Cookie':'hermes_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0','Cache-Control':'no-store'}})}

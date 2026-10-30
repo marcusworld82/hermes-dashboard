@@ -50,11 +50,11 @@ test('simultaneous autosaves preserve exactly one new immutable revision and rep
   assert.equal(results.filter(r => r.status === 'fulfilled').length, 1); assert.equal(results.filter(r => r.status === 'rejected' && r.reason.code === 'REVISION_CONFLICT').length, 1);
   assert.equal((await f.projects.load('owner', p.id)).revision, 2);
 });
-test('storage HTTP fails closed before storage calls and rejects unauthenticated or cross-origin uploads', async () => {
+test('link-public storage HTTP needs storage configuration and still rejects cross-origin uploads', async () => {
   const f = storage(); let loads = 0; const env = { HERMES_SESSION_SECRET: 'offline-project-secret' };
   const req = (authenticated, origin = 'https://hermes.test') => new Request('https://hermes.test/api/cutline-cloud/projects?name=clip', { method: 'POST', headers: { host: 'hermes.test', origin, 'content-type': 'video/mp4', ...(authenticated ? { cookie: `hermes_session=${makeSession(env.HERMES_SESSION_SECRET)}` } : {}) }, body: fixtureMP4() });
   const handler = createCutlineProjectHTTP({ env, async loadProjects() { loads++; return f.projects; }, editorHTML: async () => 'fixture' });
-  assert.equal((await handler(req(false), 'create')).status, 401); assert.equal((await handler(req(true, 'https://attacker.test'), 'create')).status, 403); assert.equal((await handler(req(true), 'create')).status, 503); assert.equal(loads, 0);
+  assert.equal((await handler(req(false), 'create')).status, 503); assert.equal((await handler(req(true, 'https://attacker.test'), 'create')).status, 403); assert.equal((await handler(req(true), 'create')).status, 503); assert.equal(loads, 0);
   const enabled = createCutlineProjectHTTP({ env: { ...env, CUTLINE_CLOUD_STORAGE_ENABLED: 'true', CUTLINE_CLOUD_UPLOADS_ENABLED: 'true', BLOB_STORE_ID: 'offline', VERCEL_OIDC_TOKEN: 'offline' }, loadProjects: async () => f.projects, editorHTML: async () => 'fixture' });
   const response = await enabled(req(true), 'create'); assert.equal(response.status, 201); assert.ok((await response.json()).doc.id); assert.equal(f.calls.some(c => c[0] === 'put'), true);
 });

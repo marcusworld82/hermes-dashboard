@@ -1,3 +1,4 @@
+import { LINK_PUBLIC_ACCESS } from './link-public.mjs';
 import { validSession, sameOrigin } from './security.mjs';
 import { CutlineError, parseRenderRequest, readBoundedJson } from './cutline-cloud-core.mjs';
 import { cutlineCloudStatus } from './cutline-cloud-status.mjs';
@@ -5,9 +6,9 @@ const headers = { 'Cache-Control': 'private, no-store' };
 const publicJob = job => ({ id: job.id, projectId: job.projectId, revision: job.revision, state: job.state, createdAt: job.createdAt, updatedAt: job.updatedAt, ...(job.errorCode ? { errorCode: job.errorCode } : {}), ...(job.state === 'succeeded' ? { downloadPath: `/api/cutline-cloud/jobs/${job.id}/output` } : {}) });
 export function cutlineCloudOwner(request, env) {
   const token = request.headers.get('cookie')?.split(';').map(s => s.trim()).find(s => s.startsWith('hermes_session='))?.slice('hermes_session='.length) || '';
-  if (!validSession(token, env.HERMES_SESSION_SECRET || '')) throw new CutlineError('UNAUTHORIZED', 'Sign in to Hermes.', 401);
+  if (!LINK_PUBLIC_ACCESS && !validSession(token, env.HERMES_SESSION_SECRET || '')) throw new CutlineError('UNAUTHORIZED', 'Sign in to Hermes.', 401);
   if (!['GET', 'HEAD'].includes(request.method) && !sameOrigin(request.headers.get('origin'), request.headers.get('host'))) throw new CutlineError('INVALID_ORIGIN', 'Request origin does not match.', 403);
-  // Existing Hermes is single-owner. Never take an owner identifier from client data.
+  // Existing single workspace is intentionally link-public. Do not accept a client owner id.
   return 'owner';
 }
 export function createCutlineHTTP({ env = process.env, loadRuntime, status = async () => cutlineCloudStatus(env) }) {

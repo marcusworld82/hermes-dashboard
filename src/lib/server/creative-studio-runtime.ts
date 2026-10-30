@@ -1,3 +1,4 @@
+import {PUBLIC_PAID_GENERATION_ENABLED} from "./link-public.mjs";
 import { CreativeStudio, StudioError, type StudioJob, type StudioStore } from "./creative-studio-core.ts";
 import { STUDIO_MODELS, publicStudioModels } from "./creative-studio-models.ts";
 import { HiggsfieldStudioProvider } from "./creative-studio-provider.ts";
@@ -28,7 +29,7 @@ import { BlobStudioStore } from "./creative-studio-store.ts";
  */
 const config = () => {
   const monthlyUsd = Number(process.env.STUDIO_MONTHLY_BUDGET_USD ?? "");
-  return { monthlyUsd, spending: process.env.STUDIO_SPEND_ENABLED === "true", storage: process.env.STUDIO_STORAGE_ENABLED === "true", provider: !!process.env.HF_API_KEY_ID?.trim() && !!process.env.HF_API_KEY_SECRET?.trim(), storageCredentials: !!process.env.BLOB_READ_WRITE_TOKEN || (!!process.env.BLOB_STORE_ID && !!process.env.VERCEL_OIDC_TOKEN), outputHosts: (process.env.STUDIO_OUTPUT_HOSTS || "images.higgs.ai,d28lhcrx5qdowv.cloudfront.net").split(",").map(s=>s.trim()).filter(s=>/^[a-z0-9.-]+$/.test(s) && !/^[0-9.]+$/.test(s)) };
+  return { monthlyUsd, spending: PUBLIC_PAID_GENERATION_ENABLED && process.env.STUDIO_SPEND_ENABLED === "true", storage: process.env.STUDIO_STORAGE_ENABLED === "true", provider: !!process.env.HF_API_KEY_ID?.trim() && !!process.env.HF_API_KEY_SECRET?.trim(), storageCredentials: !!process.env.BLOB_READ_WRITE_TOKEN || (!!process.env.BLOB_STORE_ID && !!process.env.VERCEL_OIDC_TOKEN), outputHosts: (process.env.STUDIO_OUTPUT_HOSTS || "images.higgs.ai,d28lhcrx5qdowv.cloudfront.net").split(",").map(s=>s.trim()).filter(s=>/^[a-z0-9.-]+$/.test(s) && !/^[0-9.]+$/.test(s)) };
 };
 export function creativeStudioStatus() {
   const c=config(), blockers: {code:string;message:string}[]=[];
