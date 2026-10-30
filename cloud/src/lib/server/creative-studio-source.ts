@@ -14,6 +14,9 @@ export function sourceDeliveryConfig(env: Record<string,string|undefined> = proc
   if(env.STUDIO_SOURCE_ENABLED!=="true" || secret.length<32 || base.protocol!=="https:" || base.username || base.password || base.port || base.pathname!=="/" || base.search || base.hash || ![CANONICAL_HOST,...extra].includes(base.hostname)) throw new StudioError("SOURCE_DELIVERY_NOT_CONFIGURED","Image-to-video requires STUDIO_SOURCE_ENABLED=true, an owner-managed STUDIO_SOURCE_SIGNING_SECRET of at least 32 characters and an approved STUDIO_PUBLIC_BASE_URL. Other Studio models remain available.",503);
   return {origin:base.origin,secret};
 }
+export function requireSourceDeployment(requestUrl:string,config:SourceDeliveryConfig) {
+  if(new URL(requestUrl).origin!==config.origin)throw new StudioError("SOURCE_DEPLOYMENT_MISMATCH","Open the owner-approved Studio app URL, or explicitly configure this preview's HTTPS source base and allowed host before sharing an image. No paid request was submitted.",409);
+}
 export function sourceDeliveryReady() { try {sourceDeliveryConfig();return true;}catch{return false;} }
 export function savedStudioSource(state: StudioState, jobId: unknown, outputIndex: unknown): StudioSource {
   if(typeof jobId!=="string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(jobId) || typeof outputIndex!=="number" || !Number.isInteger(outputIndex) || outputIndex<0 || outputIndex>7)throw new StudioError("INVALID_SOURCE","Choose a saved Studio image output.",400);
