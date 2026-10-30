@@ -20,8 +20,8 @@ export default function CloudCutlineManager({ capability }: { capability: CloudC
       if (capability.directUploadAvailable) {
         const allocation = await fetch('/api/cutline-cloud/uploads/prepare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, size: file.size, contentType: 'video/mp4' }) });
         const prepared = await allocation.json(); if (!allocation.ok) throw Error(prepared.error || 'Could not allocate a private upload.');
-        const { upload: directUpload } = await import('@vercel/blob/client');
-        await directUpload(prepared.pathname, file, { access: 'private', contentType: 'video/mp4', handleUploadUrl: '/api/cutline-cloud/uploads/token', clientPayload: prepared.uploadId, multipart: true });
+        if(prepared.signedUploadUrl){const url=new URL(prepared.signedUploadUrl);if(url.protocol!=='https:'||! /^[a-z0-9]+\.supabase\.co$/.test(url.hostname)||url.username||url.password||url.port)throw Error('Invalid private upload destination');const uploadResponse=await fetch(url,{method:'PUT',headers:{'Content-Type':'video/mp4'},body:file,redirect:'error'});if(!uploadResponse.ok)throw Error('Private MP4 upload failed.');}else{const { upload: directUpload } = await import('@vercel/blob/client');
+        await directUpload(prepared.pathname, file, { access: 'private', contentType: 'video/mp4', handleUploadUrl: '/api/cutline-cloud/uploads/token', clientPayload: prepared.uploadId, multipart: true });}
         response = await fetch('/api/cutline-cloud/uploads/finalize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uploadId: prepared.uploadId }) });
       } else {
         response = await fetch('/api/cutline-cloud/projects?name=' + encodeURIComponent(file.name), { method: 'POST', headers: { 'Content-Type': 'video/mp4' }, body: file });

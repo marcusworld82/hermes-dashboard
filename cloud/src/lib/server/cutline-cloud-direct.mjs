@@ -10,12 +10,14 @@ export function createCutlineDirectHTTP({ env = process.env, loadResources, hand
     let resources; let claimed;
     try {
       const owner = cutlineCloudOwner(request, env); const config = cutlineCloudConfig(env);
-      if (!config.storage || !config.storageCredentials || !config.uploads || env.CUTLINE_CLOUD_DIRECT_UPLOADS_ENABLED !== 'true' || !env.BLOB_READ_WRITE_TOKEN) throw new CutlineError('DIRECT_UPLOAD_DISABLED', 'Direct uploads need explicit owner enablement, existing private storage capacity and the existing Blob read/write credential.', 503);
+      if (!config.storage || !config.storageCredentials || !config.uploads || !config.directUploads) throw new CutlineError('DIRECT_UPLOAD_DISABLED', 'Direct uploads need explicit owner enablement, existing private storage capacity and the existing Blob read/write credential.', 503);
       const body = await readBoundedJson(request); resources = await loadResources();
       if (action === 'prepare') {
         if (!body || Object.keys(body).some(k => !['name', 'size', 'contentType'].includes(k)) || body.contentType !== 'video/mp4' || !Number.isSafeInteger(body.size) || body.size < 32 || body.size > DIRECT_UPLOAD_BYTES || typeof body.name !== 'string' || body.name.length > 200) throw new CutlineError('INVALID_UPLOAD', 'Choose an MP4 up to 128 MiB.');
         const projectId = makeId(); const id = makeId(); const record = { id, projectId, owner, path: sourcePath(owner, projectId), name: body.name, size: body.size, contentType: 'video/mp4', state: 'pending', createdAt: now(), expiresAt: now() + 15 * 60000 };
+        if(resources.signUpload)record.objectPath='objects/'+makeId();
         await resources.uploads.create(record);
+        if(resources.signUpload){await resources.uploads.issue(owner,id,record.path);const signedUploadUrl=await resources.signUpload(record.objectPath);return Response.json({uploadId:id,signedUploadUrl,expiresAt:record.expiresAt,maxBytes:DIRECT_UPLOAD_BYTES},{status:201,headers});}
         return Response.json({ uploadId: id, pathname: record.path, expiresAt: record.expiresAt, maxBytes: DIRECT_UPLOAD_BYTES }, { status: 201, headers });
       }
       if (action === 'token') {
@@ -33,6 +35,7 @@ export function createCutlineDirectHTTP({ env = process.env, loadResources, hand
         claimed = await resources.uploads.claim(owner, body.uploadId);
         // Resolve only the durable server allocation; never accept a URL/path here.
         if (claimed.path !== sourcePath(owner, claimed.projectId)) throw new CutlineError('UPLOAD_OWNERSHIP', 'Upload path is invalid.');
+        if(resources.registerUpload)await resources.registerUpload(claimed.path,claimed.objectPath,claimed.size);
         const metadata = await resources.blob.head(claimed.path);
         if (metadata.pathname !== claimed.path || metadata.size !== claimed.size || metadata.size > DIRECT_UPLOAD_BYTES || metadata.contentType?.split(';')[0] !== 'video/mp4') throw new CutlineError('INVALID_UPLOAD', 'Uploaded MIME, size or private path did not match its allocation.', 415);
         const bytes = await resources.projects.readPrivate(claimed.path, DIRECT_UPLOAD_BYTES);

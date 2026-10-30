@@ -1,3 +1,4 @@
+import {privateStorage} from './private-storage';
 import { createCutlineHTTP } from './cutline-cloud-http.mjs';
 import { createConfiguredCutlineRuntime } from './cutline-cloud-runtime.mjs';
 import { createCutlineCompiler } from './cutline-cloud-compiler.mjs';
@@ -22,11 +23,11 @@ export const cutlineCloudHTTP = createCutlineHTTP({
   },
   async loadRuntime(action: string) {
     if (['job', 'output'].includes(action)) {
-      const blob = await import('@vercel/blob');
+      const blob = privateStorage();
       return { store: createCutlineBlobBackend({ blob, approvedBudget: undefined }).store, outputs: createPrivateBlobOutputs({ blob }) };
     }
     const [sdk, blob, trustedAssets] = await Promise.all([
-      import('@vercel/sandbox'), import('@vercel/blob'), loadCutlineTrustedAssets(),
+      import('@vercel/sandbox'), Promise.resolve(privateStorage()), loadCutlineTrustedAssets(),
     ]);
     const c = cutlineCloudConfig();
     return createConfiguredCutlineRuntime({

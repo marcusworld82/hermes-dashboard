@@ -1,3 +1,4 @@
+import {privateStorage} from './private-storage.ts';
 import { createHash } from "node:crypto";
 import { get, put, BlobPreconditionFailedError } from "@vercel/blob";
 import { StudioError, type StudioState, type StudioStore, type SavedOutput, type Payload } from "./creative-studio-core.ts";
@@ -12,7 +13,7 @@ export class BlobStudioStore implements StudioStore {
   private fetcher: typeof fetch;
   private outputHosts: string[];
   private blob: { get: typeof get; put: typeof put };
-  constructor(outputHosts: string[], fetcher: typeof fetch = fetch, blob = { get, put }) { this.outputHosts = outputHosts; this.fetcher = fetcher; this.blob = blob; }
+  constructor(outputHosts: string[], fetcher: typeof fetch = fetch, blob = privateStorage()) { this.outputHosts = outputHosts; this.fetcher = fetcher; this.blob = blob; }
   private async load() {
     try {
       const blob = await this.blob.get(STATE_KEY,{access:"private",useCache:false});
@@ -35,7 +36,7 @@ export class BlobStudioStore implements StudioStore {
         await this.blob.put(STATE_KEY,serialized,{access:"private",addRandomSuffix:false,allowOverwrite:!!etag,...(etag?{ifMatch:etag}:{}),contentType:"application/json",cacheControlMaxAge:60});
         return structuredClone(result);
       } catch (e) {
-        if (e instanceof BlobPreconditionFailedError || (!etag && e instanceof Error && /already exists/i.test(e.message))) continue;
+        if (e instanceof BlobPreconditionFailedError || (e instanceof Error && e.name === "BlobPreconditionFailedError") || (!etag && e instanceof Error && /already exists/i.test(e.message))) continue;
         throw new StudioError("STORAGE_UNAVAILABLE","Studio could not durably save its reservation. No new generation may be submitted. Restore private storage capacity.",503);
       }
     }

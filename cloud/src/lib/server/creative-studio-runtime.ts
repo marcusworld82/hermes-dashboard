@@ -1,3 +1,4 @@
+import {supabaseStorageConfigured} from './hermes-storage.mjs';
 import {PUBLIC_PAID_GENERATION_ENABLED} from "./link-public.mjs";
 import { CreativeStudio, StudioError, type StudioJob, type StudioStore } from "./creative-studio-core.ts";
 import { STUDIO_MODELS, publicStudioModels } from "./creative-studio-models.ts";
@@ -29,15 +30,15 @@ import { BlobStudioStore } from "./creative-studio-store.ts";
  */
 const config = () => {
   const monthlyUsd = Number(process.env.STUDIO_MONTHLY_BUDGET_USD ?? "");
-  return { monthlyUsd, spending: PUBLIC_PAID_GENERATION_ENABLED && process.env.STUDIO_SPEND_ENABLED === "true", storage: process.env.STUDIO_STORAGE_ENABLED === "true", provider: !!process.env.HF_API_KEY_ID?.trim() && !!process.env.HF_API_KEY_SECRET?.trim(), storageCredentials: !!process.env.BLOB_READ_WRITE_TOKEN || (!!process.env.BLOB_STORE_ID && !!process.env.VERCEL_OIDC_TOKEN), outputHosts: (process.env.STUDIO_OUTPUT_HOSTS || "images.higgs.ai,d28lhcrx5qdowv.cloudfront.net").split(",").map(s=>s.trim()).filter(s=>/^[a-z0-9.-]+$/.test(s) && !/^[0-9.]+$/.test(s)) };
+  return { monthlyUsd, spending: PUBLIC_PAID_GENERATION_ENABLED && process.env.STUDIO_SPEND_ENABLED === "true", storage: process.env.STUDIO_STORAGE_ENABLED === "true", provider: !!process.env.HF_API_KEY_ID?.trim() && !!process.env.HF_API_KEY_SECRET?.trim(), storageCredentials: process.env.HERMES_STORAGE_PROVIDER==='supabase'?supabaseStorageConfigured():!!process.env.BLOB_READ_WRITE_TOKEN || (!!process.env.BLOB_STORE_ID && !!process.env.VERCEL_OIDC_TOKEN), outputHosts: (process.env.STUDIO_OUTPUT_HOSTS || "images.higgs.ai,d28lhcrx5qdowv.cloudfront.net").split(",").map(s=>s.trim()).filter(s=>/^[a-z0-9.-]+$/.test(s) && !/^[0-9.]+$/.test(s)) };
 };
 export function creativeStudioStatus() {
   const c=config(), blockers: {code:string;message:string}[]=[];
-  if (!c.spending) blockers.push({code:"SPENDING_DISABLED",message:"Paid Studio submissions are disabled. The owner can set STUDIO_SPEND_ENABLED=true after completing setup."});
-  if (!c.storage || !c.storageCredentials) blockers.push({code:"STORAGE_UNAVAILABLE",message:"Restore the existing private Blob quota, then configure STUDIO_STORAGE_ENABLED=true with its server-side credentials. Studio does not bypass storage limits."});
+  if (!c.spending) blockers.push({code:"SPENDING_DISABLED",message:"Paid Studio submissions are disabled in this public release. Provider setup and an approved spending limit are required before enabling them."});
+  if (!c.storage || !c.storageCredentials) blockers.push({code:"STORAGE_UNAVAILABLE",message:"Configure the selected private storage provider and enable STUDIO_STORAGE_ENABLED. Supabase uses HERMES_SUPABASE_URL and HERMES_SUPABASE_SECRET_KEY on the server."});
   if (!Number.isFinite(c.monthlyUsd) || c.monthlyUsd<=0) blockers.push({code:"BUDGET_REQUIRED",message:"Configure a positive STUDIO_MONTHLY_BUDGET_USD before paid submissions."});
   if (!c.provider) blockers.push({code:"PROVIDER_NOT_CONNECTED",message:"Connect HF_API_KEY_ID and HF_API_KEY_SECRET in the owner deployment environment."});
-  return { enabled:blockers.length===0, canReadJobs:c.storage&&c.storageCredentials, provider:"higgsfield", publishingConnected:false, maxConcurrentJobs:3, quoteTtlSeconds:600, pollIntervalMs:{min:2000,max:8000}, models:publicStudioModels().map(m=>({...m,...(m.requiresSource?{sourceReady:sourceDeliveryReady(),sourceBlocker:sourceDeliveryReady()?null:"Configure owner-managed expiring source delivery before making a saved image move."}:{})})), blockers, budget:{monthlyUsd:Number.isFinite(c.monthlyUsd)&&c.monthlyUsd>0?c.monthlyUsd:null,reservedUsd:null as number|null,warning:false,accounting:"unavailable"}, storageHealth:"not_checked" };
+  return { canEstimate:c.provider, enabled:blockers.length===0, canReadJobs:c.storage&&c.storageCredentials, provider:"higgsfield", publishingConnected:false, maxConcurrentJobs:3, quoteTtlSeconds:600, pollIntervalMs:{min:2000,max:8000}, models:publicStudioModels().map(m=>({...m,...(m.requiresSource?{sourceReady:sourceDeliveryReady(),sourceBlocker:sourceDeliveryReady()?null:"Configure owner-managed expiring source delivery before making a saved image move."}:{})})), blockers, budget:{monthlyUsd:Number.isFinite(c.monthlyUsd)&&c.monthlyUsd>0?c.monthlyUsd:null,reservedUsd:null as number|null,warning:false,accounting:"unavailable"}, storageHealth:"not_checked" };
 }
 export function studioStorage() {
   const c=config();

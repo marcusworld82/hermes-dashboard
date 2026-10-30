@@ -109,3 +109,11 @@ test('cloud editor warns before debounce and keeps dirty until every queued edit
   writes[0].resolve(Response.json({revision:2}));await first;await new Promise(r=>setTimeout(r,0));assert.equal(writes.length,2);assert.equal(writes[1].body.baseRevision,2);assert.equal(dirty(),true,'earlier save must not clear a newer unsaved edit');
   writes[1].resolve(Response.json({revision:3}));await second;assert.equal(dirty(),false);
 });
+
+test('Supabase direct upload prepares a private destination without a Blob token',async()=>{
+ const {createCutlineDirectHTTP}=await import('../cloud/src/lib/server/cutline-cloud-direct.mjs');const f=storage();let signed,registered;
+ const env={HERMES_STORAGE_PROVIDER:'supabase',HERMES_SUPABASE_URL:'https://example.supabase.co',HERMES_SUPABASE_SECRET_KEY:'sb_secret_fixture',CUTLINE_CLOUD_STORAGE_ENABLED:'true',CUTLINE_CLOUD_UPLOADS_ENABLED:'true',CUTLINE_CLOUD_DIRECT_UPLOADS_ENABLED:'true'};
+ const handler=createCutlineDirectHTTP({env,loadResources:async()=>({blob:f.blob,uploads:f.backend.uploads,projects:f.projects,signUpload:async p=>{signed=p;return 'https://example.supabase.co/storage/v1/object/upload/sign/hermes-private/'+p+'?token=fixture';},registerUpload:async(...args)=>{registered=args;}}),handleUpload:async()=>{throw Error('Blob token must not be used')}});
+ const request=new Request('https://hermes.test/api/cutline-cloud/uploads/prepare',{method:'POST',headers:{host:'hermes.test',origin:'https://hermes.test','content-type':'application/json'},body:JSON.stringify({name:'sample.mp4',size:1000,contentType:'video/mp4'})});
+ const response=await handler(request,'prepare');assert.equal(response.status,201);const data=await response.json();assert.match(data.signedUploadUrl,/^https:\/\/example\.supabase\.co\//);const record=await f.backend.uploads.get('owner',data.uploadId);assert.equal(record.state,'token-issued');assert.equal(record.objectPath,signed);assert.equal(registered,undefined);
+});

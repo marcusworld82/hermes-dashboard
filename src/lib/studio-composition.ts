@@ -12,16 +12,16 @@ export type Composition={shape:Shape;look:Look;idea:string;slide?:Slide;index:nu
 /** One deterministic renderer drives the preview and exported PNG. Backgrounds
  * are authenticated normalized Studio artifacts, never arbitrary remote URLs. */
 export function paintStudio(ctx:CanvasRenderingContext2D,design:Composition,image?:CanvasImageSource & {width:number;height:number}){
- const size=SHAPES[design.shape],w=size.width,h=size.height,dark=design.look==='Cinematic'||!!image;
+ const size=SHAPES[design.shape],w=size.width,h=size.height,dark=design.look!=='Editorial'||!!image;
  ctx.clearRect(0,0,w,h);ctx.fillStyle=dark?'#000000':'#ffffff';ctx.fillRect(0,0,w,h);
  if(image){const crop=centerCrop(image.width,image.height,design.shape);ctx.drawImage(image,crop.x,crop.y,crop.width,crop.height,0,0,w,h);ctx.fillStyle='rgba(0,0,0,0.66)';ctx.fillRect(0,0,w,h);}
  ctx.textAlign='left';ctx.fillStyle='#dc2626';ctx.fillRect(64,64,100,8);ctx.font='600 24px sans-serif';ctx.fillText('LYFE WITH MARCUS',64,116);
- const number=design.slide?.number||'Your idea';ctx.font=`700 ${Math.min(140,Math.floor(w/(Math.max(2,number.length)*.65)))}px ${design.look==='Editorial'?'Georgia':'sans-serif'}`;ctx.fillText(number,64,h*.34);
+ const big=design.look==='Big Number';const number=design.slide?.number||'Your idea';ctx.textAlign=big?'center':'left';ctx.font=`700 ${Math.min(big?560:140,Math.floor(w/(Math.max(big?1.7:2,number.length)*.65)))}px ${design.look==='Editorial'?'Georgia':'sans-serif'}`;ctx.fillText(number,big?w/2:64,h*(big?.53:.34));
  ctx.fillStyle=dark?'#ffffff':'#000000';
- const wrap=(text:string,y:number,font:string,lineHeight:number)=>{ctx.font=font;let line='';for(const word of text.trim().split(/\s+/)){const next=(line+' '+word).trim();if(ctx.measureText(next).width>w-128&&line){ctx.fillText(line,64,y);y+=lineHeight;line=word;}else line=next;}ctx.fillText(line,64,y);return y+lineHeight;};
- const y=wrap(design.slide?.headline||design.idea,h*.49,`700 ${h<800?44:60}px ${design.look==='Editorial'?'Georgia':'sans-serif'}`,h<800?52:74);
+ const wrap=(text:string,y:number,font:string,lineHeight:number)=>{ctx.font=font;let line='';for(const word of text.trim().split(/\s+/)){const next=(line+' '+word).trim();if(ctx.measureText(next).width>w-128&&line){ctx.fillText(line,big?w/2:64,y);y+=lineHeight;line=word;}else line=next;}ctx.fillText(line,big?w/2:64,y);return y+lineHeight;};
+ const y=wrap(design.slide?.headline||design.idea,h*(big?.68:.49),`700 ${h<800?44:60}px ${design.look==='Editorial'?'Georgia':'sans-serif'}`,h<800?52:74);
  if(design.slide)wrap(design.slide.line,y+16,'400 34px sans-serif',44);
- ctx.font='400 24px sans-serif';ctx.fillText('@lyfe.with.marcus',64,h-48);ctx.textAlign='right';ctx.fillText(design.slide?`${design.index+1} / ${design.total}`:design.shape,w-64,h-48);
+ ctx.textAlign='left';ctx.font='400 24px sans-serif';ctx.fillText('@lyfe.with.marcus',64,h-48);ctx.textAlign='right';ctx.fillText(design.slide?`${design.index+1} / ${design.total}`:design.shape,w-64,h-48);
  if(design.slide&&design.index===0)ctx.fillText('Swipe →',w-64,h-88);
 }
 export async function studioCanvas(design:Composition,background?:StudioBackground){

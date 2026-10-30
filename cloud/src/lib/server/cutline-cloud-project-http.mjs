@@ -7,7 +7,7 @@ export function createCutlineProjectHTTP({ env = process.env, loadProjects, edit
   return async function handle(request, action, id, kind) {
     try {
       const owner = cutlineCloudOwner(request, env); const config = cutlineCloudConfig(env);
-      if (!config.storage || !config.storageCredentials) throw new CutlineError('PRIVATE_STORAGE_REQUIRED', 'Cloud editing requires restored private Blob capacity and explicit storage configuration. Nothing was saved.', 503);
+      if (!config.storage || !config.storageCredentials) throw new CutlineError('PRIVATE_STORAGE_REQUIRED', 'Cloud editing requires the selected private storage provider and explicit storage configuration. Nothing was saved.', 503);
       if (action === 'editor') return new Response(await editorHTML(), { headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' blob:; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'", 'Referrer-Policy': 'no-referrer' } });
       if (action === 'fonts') return Response.json({ fonts: await fonts() }, { headers });
       const projects = await loadProjects();
