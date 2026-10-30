@@ -6,6 +6,7 @@ import { cx } from "@/components/ui";
 
 const TABS = [
   { href: "/social", label: "Calendar" },
+  { href: "/social/studio", label: "Studio" },
   { href: "/social/carousels", label: "Carousels" },
   { href: "/social/content", label: "Content Machine" },
   { href: "/social/history", label: "History" },

@@ -4,7 +4,8 @@ export const maxDuration=300;
 async function relay(req:Request){
  const url=new URL(req.url);const path=url.pathname+url.search;
  if(!safeApiPath(path))return Response.json({error:'Unknown dashboard route.'},{status:404});
- const state=await readState().catch(()=>null);
+ let state;
+ try{state=await readState()}catch{return Response.json({error:'Cloud storage is unavailable. Your Mac may still be running; cloud actions cannot connect until storage access is restored.',storageUnavailable:true},{status:503,headers:{'Cache-Control':'private, no-store','Retry-After':'60'}})}
  const method=req.method;const reading=method==='GET'||method==='HEAD';let sent=false;
  if(state&&safeTunnel(state.bridgeUrl)){
   try{

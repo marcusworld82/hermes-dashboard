@@ -5,15 +5,17 @@ import {homedir} from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pruneViews} from './cloud-snapshot-policy.mjs';
+import {createSyncBudget} from './cloud-sync-budget.mjs';
 import {authorizedBearer,safeApiPath,safeTunnel} from './cloud-security.mjs';
 const file=process.env.HERMES_ACCESS_FILE||path.join(homedir(),'Library/Application Support/Hermes Dashboard/cloud-access.json');
 const config=JSON.parse(readFileSync(file,'utf8'));
 const port=Number(process.env.HERMES_BRIDGE_PORT||3202);
 const local=process.env.HERMES_LOCAL_URL||'http://127.0.0.1:3200';
-const known=new Set(['/api/overview','/api/social','/api/social/content','/api/agents','/api/pipeline','/api/kanban','/api/chat','/api/groups','/api/workflows','/api/settings','/api/skills','/api/connections','/api/connections/prospects','/api/home-brief','/api/today','/api/agent-activity','/api/leads','/api/clients','/api/lead-research','/api/outbox','/api/content-research','/api/composio/mcp/status']);
+const known=new Set(['/api/overview','/api/social','/api/social/studio','/api/social/content','/api/agents','/api/pipeline','/api/kanban','/api/chat','/api/groups','/api/workflows','/api/settings','/api/skills','/api/connections','/api/connections/prospects','/api/home-brief','/api/today','/api/agent-activity','/api/leads','/api/clients','/api/lead-research','/api/outbox','/api/content-research','/api/composio/mcp/status']);
 const cacheFile=path.join(path.dirname(file),'cloud-snapshot.json');
-let responses={};try{if(existsSync(cacheFile))responses=JSON.parse(readFileSync(cacheFile,'utf8')).responses||{}}catch{}
-let bridgeUrl='',registeredUrl='',lastHash='',syncing=false,stopping=false;
+let responses={},lastCloudSyncAt=null;try{if(existsSync(cacheFile)){const saved=JSON.parse(readFileSync(cacheFile,'utf8'));responses=saved.responses||{};lastCloudSyncAt=saved.syncedAt||null}}catch{}
+const budget=createSyncBudget({lastSyncedAt:lastCloudSyncAt});
+let bridgeUrl='',registeredUrl='',lastHash='',lastLocalHash='',syncing=false,stopping=false;
 const server=http.createServer(async(req,res)=>{
  res.setHeader('x-hermes-relay','1');res.setHeader('Cache-Control','no-store');
  if(!authorizedBearer(req.headers.authorization,config.bridgeKey)){res.writeHead(401);res.end('Unauthorized');return}
@@ -36,13 +38,15 @@ const server=http.createServer(async(req,res)=>{
  }catch{if(!res.headersSent)res.writeHead(502);res.end(JSON.stringify({error:'Local request interrupted. Check the result before retrying.'}))}
 });
 async function register(){
- if(registeredUrl===bridgeUrl)return;
- try{const r=await fetch(config.url+'/api/sync',{method:'POST',headers:{authorization:'Bearer '+config.bridgeKey,'content-type':'application/json'},body:JSON.stringify({version:1,bridgeUrl,registerOnly:true}),signal:AbortSignal.timeout(30000),redirect:'error'});if(r.ok)registeredUrl=bridgeUrl;else console.error('Bridge registration HTTP',r.status)}catch{console.error('Bridge registration failed; snapshot sync will retry')}
+ if(registeredUrl===bridgeUrl)return true;
+ if(!budget.canRegister())return false;
+ try{const r=await fetch(config.url+'/api/sync',{method:'POST',headers:{authorization:'Bearer '+config.bridgeKey,'content-type':'application/json'},body:JSON.stringify({version:1,bridgeUrl,registerOnly:true}),signal:AbortSignal.timeout(30000),redirect:'error'});await r.body?.cancel();if(r.ok){registeredUrl=bridgeUrl;budget.registrationSucceeded();return true}budget.registrationFailed();console.error('Bridge registration HTTP',r.status,'Retrying in 30 minutes.')}catch{budget.registrationFailed();console.error('Bridge registration failed; retrying in 30 minutes.')}
+ return false;
 }
 async function sync(){
  if(syncing||!safeTunnel(bridgeUrl)||stopping)return;syncing=true;
  try{
-  await register();
+  const registered=await register();
   const fresh=new Set();
   await Promise.all([...known].map(async p=>{try{const r=await fetch(local+p,{signal:AbortSignal.timeout(45000)});if(r.ok){responses[p]=await r.json();fresh.add(p)}}catch{}}));
   const before=new Set(Object.keys(responses));responses=pruneViews(responses,fresh);for(const key of before)if(!(key in responses))known.delete(key);
@@ -51,12 +55,17 @@ async function sync(){
   const boards=responses['/api/kanban']?.boards??[];for(const b of boards)if(/^[\w-]+$/.test(b.slug))known.add('/api/kanban?board='+b.slug);
   const data={version:1,bridgeUrl,responses};const raw=JSON.stringify(data);
   if(Buffer.byteLength(raw)>3_900_000)throw Error('Cloud snapshot exceeds size limit');
-  const hash=createHash('sha256').update(raw).digest('hex');if(hash===lastHash)return;
+  const hash=createHash('sha256').update(raw).digest('hex');
+  // Keep the Mac snapshot fresh without spending a cloud write on heartbeats.
+  // Live requests still pass straight through the relay; only offline copies lag.
+  const saveLocal=()=>writeFileSync(cacheFile,JSON.stringify({...data,syncedAt:lastCloudSyncAt,localUpdatedAt:new Date().toISOString()}),{mode:0o600});
+  if(hash!==lastLocalHash){saveLocal();lastLocalHash=hash}
+  if(!registered||hash===lastHash||!budget.canUpload())return;
   const result=await fetch(config.url+'/api/sync',{method:'POST',headers:{authorization:'Bearer '+config.bridgeKey,'content-type':'application/json'},body:raw,signal:AbortSignal.timeout(60000),redirect:'error'});
-  if(!result.ok)throw Error('Cloud sync HTTP '+result.status);
-  lastHash=hash;writeFileSync(cacheFile,JSON.stringify({...data,syncedAt:new Date().toISOString()}),{mode:0o600});
+  await result.body?.cancel();if(!result.ok)throw Error('Cloud sync HTTP '+result.status);
+  budget.uploaded();lastHash=hash;lastCloudSyncAt=new Date().toISOString();saveLocal();
   console.log(new Date().toISOString(),'Cloud sync saved',Object.keys(responses).length,'views');
- }catch(e){console.error(new Date().toISOString(),String(e.message).slice(0,120))}finally{syncing=false}
+ }catch(e){budget.uploadFailed();console.error(new Date().toISOString(),String(e.message).slice(0,120))}finally{syncing=false}
 }
 // Cloudflare quick tunnels can lose their public address while cloudflared keeps running.
 // Every few minutes, call our own public /health. Any answer from this relay means the tunnel is alive,
